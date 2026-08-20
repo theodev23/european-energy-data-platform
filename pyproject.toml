@@ -1,0 +1,28 @@
+[project]
+name = "european-energy-data-platform"
+version = "0.1.0"
+description = "A cloud ELT data platform for European electricity data."
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "ruff==0.16.3",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+extend-select = [
+    "B",
+    "I",
+    "UP",
+]
+
+[tool.pytest]
+minversion = "9.1"
+addopts = ["-ra"]
+testpaths = ["tests"]
+strict = true
