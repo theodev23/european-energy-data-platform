@@ -1,0 +1,45 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+
+# Environment variables and local secrets
+.env
+.env.*
+!.env.example
+secrets/
+credentials/
+service-account*.json
+gcp-key*.json
+application_default_credentials.json
+
+# Airflow
+airflow/logs/
+airflow/airflow.cfg
+airflow/airflow.db
+airflow/webserver_config.py
+
+# dbt
+dbt_packages/
+target/
+logs/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# IDEs
+.vscode/
+.idea/
