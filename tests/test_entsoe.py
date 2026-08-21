@@ -358,3 +358,25 @@ def test_build_day_ahead_price_raw_object_name_rejects_invalid_interval() -> Non
             period_start=period_start,
             period_end=period_start,
         )
+
+
+def test_build_actual_load_params_rejects_naive_period_start() -> None:
+    from european_energy_data_platform.entsoe import build_actual_load_params
+
+    with pytest.raises(ValueError, match="period_start must be timezone-aware"):
+        build_actual_load_params(
+            bidding_zone="10YFR-RTE------C",
+            period_start=datetime(2026, 8, 20, 0, 0, tzinfo=UTC).replace(tzinfo=None),
+            period_end=datetime(2026, 8, 20, 1, 0, tzinfo=UTC),
+        )
+
+
+def test_build_day_ahead_price_params_rejects_naive_period_end() -> None:
+    from european_energy_data_platform.entsoe import build_day_ahead_price_params
+
+    with pytest.raises(ValueError, match="period_end must be timezone-aware"):
+        build_day_ahead_price_params(
+            bidding_zone="10YFR-RTE------C",
+            period_start=datetime(2026, 8, 20, 0, 0, tzinfo=UTC),
+            period_end=datetime(2026, 8, 20, 1, 0, tzinfo=UTC).replace(tzinfo=None),
+        )

@@ -13,67 +13,11 @@ def format_entsoe_datetime(value: datetime) -> str:
     return value.astimezone(UTC).strftime(ENTSOE_DATETIME_FORMAT)
 
 
-def build_actual_load_params(
-    bidding_zone: str,
+def _normalize_period_to_utc(
     period_start: datetime,
     period_end: datetime,
-) -> dict[str, str]:
-    """Build query parameters for ENTSO-E Actual Total Load data."""
-    if period_end <= period_start:
-        raise ValueError("period_end must be after period_start")
-
-    return {
-        "documentType": "A65",
-        "processType": "A16",
-        "outBiddingZone_Domain": bidding_zone,
-        "periodStart": format_entsoe_datetime(period_start),
-        "periodEnd": format_entsoe_datetime(period_end),
-    }
-
-
-def build_actual_generation_params(
-    bidding_zone: str,
-    period_start: datetime,
-    period_end: datetime,
-) -> dict[str, str]:
-    """Build query parameters for ENTSO-E Actual Generation per Production Type."""
-    if period_end <= period_start:
-        raise ValueError("period_end must be after period_start")
-
-    return {
-        "documentType": "A75",
-        "processType": "A16",
-        "in_Domain": bidding_zone,
-        "periodStart": format_entsoe_datetime(period_start),
-        "periodEnd": format_entsoe_datetime(period_end),
-    }
-
-
-def build_day_ahead_price_params(
-    bidding_zone: str,
-    period_start: datetime,
-    period_end: datetime,
-) -> dict[str, str]:
-    """Build query parameters for ENTSO-E Day-Ahead Prices."""
-    if period_end <= period_start:
-        raise ValueError("period_end must be after period_start")
-
-    return {
-        "documentType": "A44",
-        "contract_MarketAgreement.type": "A01",
-        "out_Domain": bidding_zone,
-        "in_Domain": bidding_zone,
-        "periodStart": format_entsoe_datetime(period_start),
-        "periodEnd": format_entsoe_datetime(period_end),
-    }
-
-
-def build_actual_load_raw_object_name(
-    bidding_zone: str,
-    period_start: datetime,
-    period_end: datetime,
-) -> str:
-    """Build a deterministic RAW object name for Actual Total Load XML."""
+) -> tuple[datetime, datetime]:
+    """Validate a period and normalize both bounds to UTC."""
     if period_start.tzinfo is None or period_start.utcoffset() is None:
         raise ValueError("period_start must be timezone-aware")
 
@@ -83,8 +27,83 @@ def build_actual_load_raw_object_name(
     if period_end <= period_start:
         raise ValueError("period_end must be after period_start")
 
-    period_start_utc = period_start.astimezone(UTC)
-    period_end_utc = period_end.astimezone(UTC)
+    return (
+        period_start.astimezone(UTC),
+        period_end.astimezone(UTC),
+    )
+
+
+def build_actual_load_params(
+    bidding_zone: str,
+    period_start: datetime,
+    period_end: datetime,
+) -> dict[str, str]:
+    """Build query parameters for ENTSO-E Actual Total Load data."""
+    period_start_utc, period_end_utc = _normalize_period_to_utc(
+        period_start,
+        period_end,
+    )
+
+    return {
+        "documentType": "A65",
+        "processType": "A16",
+        "outBiddingZone_Domain": bidding_zone,
+        "periodStart": period_start_utc.strftime(ENTSOE_DATETIME_FORMAT),
+        "periodEnd": period_end_utc.strftime(ENTSOE_DATETIME_FORMAT),
+    }
+
+
+def build_actual_generation_params(
+    bidding_zone: str,
+    period_start: datetime,
+    period_end: datetime,
+) -> dict[str, str]:
+    """Build query parameters for ENTSO-E Actual Generation per Production Type."""
+    period_start_utc, period_end_utc = _normalize_period_to_utc(
+        period_start,
+        period_end,
+    )
+
+    return {
+        "documentType": "A75",
+        "processType": "A16",
+        "in_Domain": bidding_zone,
+        "periodStart": period_start_utc.strftime(ENTSOE_DATETIME_FORMAT),
+        "periodEnd": period_end_utc.strftime(ENTSOE_DATETIME_FORMAT),
+    }
+
+
+def build_day_ahead_price_params(
+    bidding_zone: str,
+    period_start: datetime,
+    period_end: datetime,
+) -> dict[str, str]:
+    """Build query parameters for ENTSO-E Day-Ahead Prices."""
+    period_start_utc, period_end_utc = _normalize_period_to_utc(
+        period_start,
+        period_end,
+    )
+
+    return {
+        "documentType": "A44",
+        "contract_MarketAgreement.type": "A01",
+        "out_Domain": bidding_zone,
+        "in_Domain": bidding_zone,
+        "periodStart": period_start_utc.strftime(ENTSOE_DATETIME_FORMAT),
+        "periodEnd": period_end_utc.strftime(ENTSOE_DATETIME_FORMAT),
+    }
+
+
+def build_actual_load_raw_object_name(
+    bidding_zone: str,
+    period_start: datetime,
+    period_end: datetime,
+) -> str:
+    """Build a deterministic RAW object name for Actual Total Load XML."""
+    period_start_utc, period_end_utc = _normalize_period_to_utc(
+        period_start,
+        period_end,
+    )
 
     return (
         "entsoe/actual_load/"
@@ -103,17 +122,10 @@ def build_actual_generation_raw_object_name(
     period_end: datetime,
 ) -> str:
     """Build a deterministic RAW object name for Actual Generation XML."""
-    if period_start.tzinfo is None or period_start.utcoffset() is None:
-        raise ValueError("period_start must be timezone-aware")
-
-    if period_end.tzinfo is None or period_end.utcoffset() is None:
-        raise ValueError("period_end must be timezone-aware")
-
-    if period_end <= period_start:
-        raise ValueError("period_end must be after period_start")
-
-    period_start_utc = period_start.astimezone(UTC)
-    period_end_utc = period_end.astimezone(UTC)
+    period_start_utc, period_end_utc = _normalize_period_to_utc(
+        period_start,
+        period_end,
+    )
 
     return (
         "entsoe/actual_generation/"
@@ -132,17 +144,10 @@ def build_day_ahead_price_raw_object_name(
     period_end: datetime,
 ) -> str:
     """Build a deterministic RAW object name for Day-Ahead Prices XML."""
-    if period_start.tzinfo is None or period_start.utcoffset() is None:
-        raise ValueError("period_start must be timezone-aware")
-
-    if period_end.tzinfo is None or period_end.utcoffset() is None:
-        raise ValueError("period_end must be timezone-aware")
-
-    if period_end <= period_start:
-        raise ValueError("period_end must be after period_start")
-
-    period_start_utc = period_start.astimezone(UTC)
-    period_end_utc = period_end.astimezone(UTC)
+    period_start_utc, period_end_utc = _normalize_period_to_utc(
+        period_start,
+        period_end,
+    )
 
     return (
         "entsoe/day_ahead_prices/"
