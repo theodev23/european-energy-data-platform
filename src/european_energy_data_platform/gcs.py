@@ -19,6 +19,14 @@ class GcsRawStorage:
 
         self._bucket = client.bucket(bucket_name)
 
+    @classmethod
+    def from_default_credentials(cls, bucket_name: str) -> "GcsRawStorage":
+        """Build RAW storage using Google Application Default Credentials."""
+        return cls(
+            bucket_name=bucket_name,
+            client=storage.Client(),
+        )
+
     def store(self, payload: RawPayload) -> bool:
         """Create a RAW object unless the deterministic object already exists."""
         blob = self._bucket.blob(payload.object_name)

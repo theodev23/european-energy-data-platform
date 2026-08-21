@@ -80,3 +80,24 @@ def test_gcs_raw_storage_treats_existing_object_as_idempotent() -> None:
         content_type="application/xml",
         if_generation_match=0,
     )
+
+
+def test_gcs_raw_storage_can_use_default_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = Mock(spec=storage.Client)
+    bucket = Mock()
+
+    client.bucket.return_value = bucket
+
+    client_factory = Mock(return_value=client)
+    monkeypatch.setattr(
+        "european_energy_data_platform.gcs.storage.Client",
+        client_factory,
+    )
+
+    raw_storage = GcsRawStorage.from_default_credentials(
+        bucket_name="energy-platform-raw",
+    )
+
+    assert isinstance(raw_storage, GcsRawStorage)
+    client_factory.assert_called_once_with()
+    client.bucket.assert_called_once_with("energy-platform-raw")
