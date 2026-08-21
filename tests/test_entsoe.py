@@ -100,3 +100,41 @@ def test_entsoe_client_fetches_actual_load_xml() -> None:
         timeout=30.0,
     )
     response.raise_for_status.assert_called_once_with()
+
+
+def test_build_actual_load_raw_object_name_uses_utc() -> None:
+    from european_energy_data_platform.entsoe import (
+        build_actual_load_raw_object_name,
+    )
+
+    utc_plus_two = timezone(timedelta(hours=2))
+
+    object_name = build_actual_load_raw_object_name(
+        bidding_zone="10YFR-RTE------C",
+        period_start=datetime(2026, 8, 20, 2, 0, tzinfo=utc_plus_two),
+        period_end=datetime(2026, 8, 20, 3, 0, tzinfo=utc_plus_two),
+    )
+
+    assert object_name == (
+        "entsoe/actual_load/"
+        "bidding_zone=10YFR-RTE------C/"
+        "year=2026/"
+        "month=08/"
+        "day=20/"
+        "20260820T0000Z_20260820T0100Z.xml"
+    )
+
+
+def test_build_actual_load_raw_object_name_rejects_invalid_interval() -> None:
+    from european_energy_data_platform.entsoe import (
+        build_actual_load_raw_object_name,
+    )
+
+    period_start = datetime(2026, 8, 20, 0, 0, tzinfo=UTC)
+
+    with pytest.raises(ValueError, match="period_end must be after period_start"):
+        build_actual_load_raw_object_name(
+            bidding_zone="10YFR-RTE------C",
+            period_start=period_start,
+            period_end=period_start,
+        )
