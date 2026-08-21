@@ -49,6 +49,25 @@ def build_actual_generation_params(
     }
 
 
+def build_day_ahead_price_params(
+    bidding_zone: str,
+    period_start: datetime,
+    period_end: datetime,
+) -> dict[str, str]:
+    """Build query parameters for ENTSO-E Day-Ahead Prices."""
+    if period_end <= period_start:
+        raise ValueError("period_end must be after period_start")
+
+    return {
+        "documentType": "A44",
+        "contract_MarketAgreement.type": "A01",
+        "out_Domain": bidding_zone,
+        "in_Domain": bidding_zone,
+        "periodStart": format_entsoe_datetime(period_start),
+        "periodEnd": format_entsoe_datetime(period_end),
+    }
+
+
 def build_actual_load_raw_object_name(
     bidding_zone: str,
     period_start: datetime,

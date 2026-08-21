@@ -248,3 +248,35 @@ def test_build_actual_generation_raw_object_name_rejects_invalid_interval() -> N
             period_start=period_start,
             period_end=period_start,
         )
+
+
+def test_build_day_ahead_price_params() -> None:
+    from european_energy_data_platform.entsoe import build_day_ahead_price_params
+
+    params = build_day_ahead_price_params(
+        bidding_zone="10YFR-RTE------C",
+        period_start=datetime(2026, 8, 20, 0, 0, tzinfo=UTC),
+        period_end=datetime(2026, 8, 20, 1, 0, tzinfo=UTC),
+    )
+
+    assert params == {
+        "documentType": "A44",
+        "contract_MarketAgreement.type": "A01",
+        "out_Domain": "10YFR-RTE------C",
+        "in_Domain": "10YFR-RTE------C",
+        "periodStart": "202608200000",
+        "periodEnd": "202608200100",
+    }
+
+
+def test_build_day_ahead_price_params_rejects_invalid_interval() -> None:
+    from european_energy_data_platform.entsoe import build_day_ahead_price_params
+
+    period_start = datetime(2026, 8, 20, 0, 0, tzinfo=UTC)
+
+    with pytest.raises(ValueError, match="period_end must be after period_start"):
+        build_day_ahead_price_params(
+            bidding_zone="10YFR-RTE------C",
+            period_start=period_start,
+            period_end=period_start,
+        )
