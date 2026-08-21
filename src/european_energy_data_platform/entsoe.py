@@ -1,5 +1,7 @@
 from datetime import UTC, datetime
 
+import requests
+
 ENTSOE_DATETIME_FORMAT = "%Y%m%d%H%M"
 
 
@@ -27,3 +29,49 @@ def build_actual_load_params(
         "periodStart": format_entsoe_datetime(period_start),
         "periodEnd": format_entsoe_datetime(period_end),
     }
+
+
+ENTSOE_API_URL = "https://web-api.tp.entsoe.eu/api"
+ENTSOE_DEFAULT_TIMEOUT_SECONDS = 30.0
+
+
+class EntsoeClient:
+    """HTTP client for the ENTSO-E Transparency Platform Web API."""
+
+    def __init__(
+        self,
+        security_token: str,
+        session: requests.Session | None = None,
+        timeout: float = ENTSOE_DEFAULT_TIMEOUT_SECONDS,
+    ) -> None:
+        security_token = security_token.strip()
+
+        if not security_token:
+            raise ValueError("ENTSO-E security token must not be empty")
+
+        self._security_token = security_token
+        self._session = session or requests.Session()
+        self._timeout = timeout
+
+    def fetch_actual_load(
+        self,
+        bidding_zone: str,
+        period_start: datetime,
+        period_end: datetime,
+    ) -> bytes:
+        """Fetch raw Actual Total Load XML from ENTSO-E."""
+        params = build_actual_load_params(
+            bidding_zone=bidding_zone,
+            period_start=period_start,
+            period_end=period_end,
+        )
+        params["securityToken"] = self._security_token
+
+        response = self._session.get(
+            ENTSOE_API_URL,
+            params=params,
+            timeout=self._timeout,
+        )
+        response.raise_for_status()
+
+        return response.content
