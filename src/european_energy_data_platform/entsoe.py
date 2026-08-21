@@ -31,6 +31,24 @@ def build_actual_load_params(
     }
 
 
+def build_actual_generation_params(
+    bidding_zone: str,
+    period_start: datetime,
+    period_end: datetime,
+) -> dict[str, str]:
+    """Build query parameters for ENTSO-E Actual Generation per Production Type."""
+    if period_end <= period_start:
+        raise ValueError("period_end must be after period_start")
+
+    return {
+        "documentType": "A75",
+        "processType": "A16",
+        "in_Domain": bidding_zone,
+        "periodStart": format_entsoe_datetime(period_start),
+        "periodEnd": format_entsoe_datetime(period_end),
+    }
+
+
 def build_actual_load_raw_object_name(
     bidding_zone: str,
     period_start: datetime,
