@@ -94,25 +94,40 @@ def build_day_ahead_price_params(
     }
 
 
-def build_actual_load_raw_object_name(
+def _build_raw_object_name(
+    dataset: str,
     bidding_zone: str,
     period_start: datetime,
     period_end: datetime,
 ) -> str:
-    """Build a deterministic RAW object name for Actual Total Load XML."""
+    """Build a deterministic ENTSO-E RAW object name."""
     period_start_utc, period_end_utc = _normalize_period_to_utc(
         period_start,
         period_end,
     )
 
     return (
-        "entsoe/actual_load/"
+        f"entsoe/{dataset}/"
         f"bidding_zone={bidding_zone}/"
         f"year={period_start_utc:%Y}/"
         f"month={period_start_utc:%m}/"
         f"day={period_start_utc:%d}/"
         f"{period_start_utc:%Y%m%dT%H%MZ}_"
         f"{period_end_utc:%Y%m%dT%H%MZ}.xml"
+    )
+
+
+def build_actual_load_raw_object_name(
+    bidding_zone: str,
+    period_start: datetime,
+    period_end: datetime,
+) -> str:
+    """Build a deterministic RAW object name for Actual Total Load XML."""
+    return _build_raw_object_name(
+        dataset="actual_load",
+        bidding_zone=bidding_zone,
+        period_start=period_start,
+        period_end=period_end,
     )
 
 
@@ -122,19 +137,11 @@ def build_actual_generation_raw_object_name(
     period_end: datetime,
 ) -> str:
     """Build a deterministic RAW object name for Actual Generation XML."""
-    period_start_utc, period_end_utc = _normalize_period_to_utc(
-        period_start,
-        period_end,
-    )
-
-    return (
-        "entsoe/actual_generation/"
-        f"bidding_zone={bidding_zone}/"
-        f"year={period_start_utc:%Y}/"
-        f"month={period_start_utc:%m}/"
-        f"day={period_start_utc:%d}/"
-        f"{period_start_utc:%Y%m%dT%H%MZ}_"
-        f"{period_end_utc:%Y%m%dT%H%MZ}.xml"
+    return _build_raw_object_name(
+        dataset="actual_generation",
+        bidding_zone=bidding_zone,
+        period_start=period_start,
+        period_end=period_end,
     )
 
 
@@ -144,19 +151,11 @@ def build_day_ahead_price_raw_object_name(
     period_end: datetime,
 ) -> str:
     """Build a deterministic RAW object name for Day-Ahead Prices XML."""
-    period_start_utc, period_end_utc = _normalize_period_to_utc(
-        period_start,
-        period_end,
-    )
-
-    return (
-        "entsoe/day_ahead_prices/"
-        f"bidding_zone={bidding_zone}/"
-        f"year={period_start_utc:%Y}/"
-        f"month={period_start_utc:%m}/"
-        f"day={period_start_utc:%d}/"
-        f"{period_start_utc:%Y%m%dT%H%MZ}_"
-        f"{period_end_utc:%Y%m%dT%H%MZ}.xml"
+    return _build_raw_object_name(
+        dataset="day_ahead_prices",
+        bidding_zone=bidding_zone,
+        period_start=period_start,
+        period_end=period_end,
     )
 
 
