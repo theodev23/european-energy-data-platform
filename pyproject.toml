@@ -7,7 +7,10 @@ name = "european-energy-data-platform"
 version = "0.1.0"
 description = "A cloud ELT data platform for European electricity data."
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "requests==2.34.2",
+    "urllib3==2.7.0",
+]
 
 [project.optional-dependencies]
 dev = [

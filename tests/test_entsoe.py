@@ -1,0 +1,407 @@
+from datetime import UTC, datetime, timedelta, timezone
+
+import pytest
+
+from european_energy_data_platform.entsoe import format_entsoe_datetime
+
+
+def test_format_entsoe_datetime_in_utc() -> None:
+    value = datetime(2026, 8, 20, 0, 0, tzinfo=UTC)
+
+    assert format_entsoe_datetime(value) == "202608200000"
+
+
+def test_format_entsoe_datetime_converts_to_utc() -> None:
+    utc_plus_two = timezone(timedelta(hours=2))
+    value = datetime(2026, 8, 20, 2, 0, tzinfo=utc_plus_two)
+
+    assert format_entsoe_datetime(value) == "202608200000"
+
+
+def test_format_entsoe_datetime_rejects_naive_datetime() -> None:
+    value = datetime(2026, 8, 20, 0, 0, tzinfo=UTC).replace(tzinfo=None)
+
+    with pytest.raises(ValueError, match="timezone-aware"):
+        format_entsoe_datetime(value)
+
+
+def test_build_actual_load_params() -> None:
+    from european_energy_data_platform.entsoe import build_actual_load_params
+
+    params = build_actual_load_params(
+        bidding_zone="10YFR-RTE------C",
+        period_start=datetime(2026, 8, 20, 0, 0, tzinfo=UTC),
+        period_end=datetime(2026, 8, 20, 1, 0, tzinfo=UTC),
+    )
+
+    assert params == {
+        "documentType": "A65",
+        "processType": "A16",
+        "outBiddingZone_Domain": "10YFR-RTE------C",
+        "periodStart": "202608200000",
+        "periodEnd": "202608200100",
+    }
+
+
+def test_build_actual_load_params_rejects_invalid_interval() -> None:
+    from european_energy_data_platform.entsoe import build_actual_load_params
+
+    period_start = datetime(2026, 8, 20, 0, 0, tzinfo=UTC)
+
+    with pytest.raises(ValueError, match="period_end must be after period_start"):
+        build_actual_load_params(
+            bidding_zone="10YFR-RTE------C",
+            period_start=period_start,
+            period_end=period_start,
+        )
+
+
+def test_entsoe_client_rejects_empty_security_token() -> None:
+    from european_energy_data_platform.entsoe import EntsoeClient
+
+    with pytest.raises(ValueError, match="security token must not be empty"):
+        EntsoeClient("   ")
+
+
+def test_entsoe_client_fetches_actual_load_xml() -> None:
+    from unittest.mock import Mock
+
+    from european_energy_data_platform.entsoe import EntsoeClient
+
+    session = Mock()
+    response = Mock()
+    response.content = b"<GL_MarketDocument />"
+    session.get.return_value = response
+
+    client = EntsoeClient(
+        security_token="test-token",
+        session=session,
+        timeout=30.0,
+    )
+
+    result = client.fetch_actual_load(
+        bidding_zone="10YFR-RTE------C",
+        period_start=datetime(2026, 8, 20, 0, 0, tzinfo=UTC),
+        period_end=datetime(2026, 8, 20, 1, 0, tzinfo=UTC),
+    )
+
+    assert result == b"<GL_MarketDocument />"
+
+    session.get.assert_called_once_with(
+        "https://web-api.tp.entsoe.eu/api",
+        params={
+            "documentType": "A65",
+            "processType": "A16",
+            "outBiddingZone_Domain": "10YFR-RTE------C",
+            "periodStart": "202608200000",
+            "periodEnd": "202608200100",
+            "securityToken": "test-token",
+        },
+        timeout=30.0,
+    )
+    response.raise_for_status.assert_called_once_with()
+
+
+def test_build_actual_load_raw_object_name_uses_utc() -> None:
+    from european_energy_data_platform.entsoe import (
+        build_actual_load_raw_object_name,
+    )
+
+    utc_plus_two = timezone(timedelta(hours=2))
+
+    object_name = build_actual_load_raw_object_name(
+        bidding_zone="10YFR-RTE------C",
+        period_start=datetime(2026, 8, 20, 2, 0, tzinfo=utc_plus_two),
+        period_end=datetime(2026, 8, 20, 3, 0, tzinfo=utc_plus_two),
+    )
+
+    assert object_name == (
+        "entsoe/actual_load/"
+        "bidding_zone=10YFR-RTE------C/"
+        "year=2026/"
+        "month=08/"
+        "day=20/"
+        "20260820T0000Z_20260820T0100Z.xml"
+    )
+
+
+def test_build_actual_load_raw_object_name_rejects_invalid_interval() -> None:
+    from european_energy_data_platform.entsoe import (
+        build_actual_load_raw_object_name,
+    )
+
+    period_start = datetime(2026, 8, 20, 0, 0, tzinfo=UTC)
+
+    with pytest.raises(ValueError, match="period_end must be after period_start"):
+        build_actual_load_raw_object_name(
+            bidding_zone="10YFR-RTE------C",
+            period_start=period_start,
+            period_end=period_start,
+        )
+
+
+def test_build_actual_generation_params() -> None:
+    from european_energy_data_platform.entsoe import build_actual_generation_params
+
+    params = build_actual_generation_params(
+        bidding_zone="10YFR-RTE------C",
+        period_start=datetime(2026, 8, 20, 0, 0, tzinfo=UTC),
+        period_end=datetime(2026, 8, 20, 1, 0, tzinfo=UTC),
+    )
+
+    assert params == {
+        "documentType": "A75",
+        "processType": "A16",
+        "in_Domain": "10YFR-RTE------C",
+        "periodStart": "202608200000",
+        "periodEnd": "202608200100",
+    }
+
+
+def test_build_actual_generation_params_rejects_invalid_interval() -> None:
+    from european_energy_data_platform.entsoe import build_actual_generation_params
+
+    period_start = datetime(2026, 8, 20, 0, 0, tzinfo=UTC)
+
+    with pytest.raises(ValueError, match="period_end must be after period_start"):
+        build_actual_generation_params(
+            bidding_zone="10YFR-RTE------C",
+            period_start=period_start,
+            period_end=period_start,
+        )
+
+
+def test_entsoe_client_fetches_actual_generation_xml() -> None:
+    from unittest.mock import Mock
+
+    from european_energy_data_platform.entsoe import EntsoeClient
+
+    session = Mock()
+    response = Mock()
+    response.content = b"<GL_MarketDocument />"
+    session.get.return_value = response
+
+    client = EntsoeClient(
+        security_token="test-token",
+        session=session,
+        timeout=30.0,
+    )
+
+    result = client.fetch_actual_generation(
+        bidding_zone="10YFR-RTE------C",
+        period_start=datetime(2026, 8, 20, 0, 0, tzinfo=UTC),
+        period_end=datetime(2026, 8, 20, 1, 0, tzinfo=UTC),
+    )
+
+    assert result == b"<GL_MarketDocument />"
+
+    expected_url = "https:" + "//web-api.tp.entsoe.eu/api"
+
+    session.get.assert_called_once_with(
+        expected_url,
+        params={
+            "documentType": "A75",
+            "processType": "A16",
+            "in_Domain": "10YFR-RTE------C",
+            "periodStart": "202608200000",
+            "periodEnd": "202608200100",
+            "securityToken": "test-token",
+        },
+        timeout=30.0,
+    )
+    response.raise_for_status.assert_called_once_with()
+
+
+def test_build_actual_generation_raw_object_name_uses_utc() -> None:
+    from european_energy_data_platform.entsoe import (
+        build_actual_generation_raw_object_name,
+    )
+
+    utc_plus_two = timezone(timedelta(hours=2))
+
+    object_name = build_actual_generation_raw_object_name(
+        bidding_zone="10YFR-RTE------C",
+        period_start=datetime(2026, 8, 20, 2, 0, tzinfo=utc_plus_two),
+        period_end=datetime(2026, 8, 20, 3, 0, tzinfo=utc_plus_two),
+    )
+
+    assert object_name == (
+        "entsoe/actual_generation/"
+        "bidding_zone=10YFR-RTE------C/"
+        "year=2026/"
+        "month=08/"
+        "day=20/"
+        "20260820T0000Z_20260820T0100Z.xml"
+    )
+
+
+def test_build_actual_generation_raw_object_name_rejects_invalid_interval() -> None:
+    from european_energy_data_platform.entsoe import (
+        build_actual_generation_raw_object_name,
+    )
+
+    period_start = datetime(2026, 8, 20, 0, 0, tzinfo=UTC)
+
+    with pytest.raises(ValueError, match="period_end must be after period_start"):
+        build_actual_generation_raw_object_name(
+            bidding_zone="10YFR-RTE------C",
+            period_start=period_start,
+            period_end=period_start,
+        )
+
+
+def test_build_day_ahead_price_params() -> None:
+    from european_energy_data_platform.entsoe import build_day_ahead_price_params
+
+    params = build_day_ahead_price_params(
+        bidding_zone="10YFR-RTE------C",
+        period_start=datetime(2026, 8, 20, 0, 0, tzinfo=UTC),
+        period_end=datetime(2026, 8, 20, 1, 0, tzinfo=UTC),
+    )
+
+    assert params == {
+        "documentType": "A44",
+        "contract_MarketAgreement.type": "A01",
+        "out_Domain": "10YFR-RTE------C",
+        "in_Domain": "10YFR-RTE------C",
+        "periodStart": "202608200000",
+        "periodEnd": "202608200100",
+    }
+
+
+def test_build_day_ahead_price_params_rejects_invalid_interval() -> None:
+    from european_energy_data_platform.entsoe import build_day_ahead_price_params
+
+    period_start = datetime(2026, 8, 20, 0, 0, tzinfo=UTC)
+
+    with pytest.raises(ValueError, match="period_end must be after period_start"):
+        build_day_ahead_price_params(
+            bidding_zone="10YFR-RTE------C",
+            period_start=period_start,
+            period_end=period_start,
+        )
+
+
+def test_entsoe_client_fetches_day_ahead_prices_xml() -> None:
+    from unittest.mock import Mock
+
+    from european_energy_data_platform.entsoe import ENTSOE_API_URL, EntsoeClient
+
+    session = Mock()
+    response = Mock()
+    response.content = b"<Publication_MarketDocument />"
+    session.get.return_value = response
+
+    client = EntsoeClient(
+        security_token="test-token",
+        session=session,
+        timeout=30.0,
+    )
+
+    result = client.fetch_day_ahead_prices(
+        bidding_zone="10YFR-RTE------C",
+        period_start=datetime(2026, 8, 20, 0, 0, tzinfo=UTC),
+        period_end=datetime(2026, 8, 20, 1, 0, tzinfo=UTC),
+    )
+
+    assert result == b"<Publication_MarketDocument />"
+
+    session.get.assert_called_once_with(
+        ENTSOE_API_URL,
+        params={
+            "documentType": "A44",
+            "contract_MarketAgreement.type": "A01",
+            "out_Domain": "10YFR-RTE------C",
+            "in_Domain": "10YFR-RTE------C",
+            "periodStart": "202608200000",
+            "periodEnd": "202608200100",
+            "securityToken": "test-token",
+        },
+        timeout=30.0,
+    )
+    response.raise_for_status.assert_called_once_with()
+
+
+def test_build_day_ahead_price_raw_object_name_uses_utc() -> None:
+    from european_energy_data_platform.entsoe import (
+        build_day_ahead_price_raw_object_name,
+    )
+
+    utc_plus_two = timezone(timedelta(hours=2))
+
+    object_name = build_day_ahead_price_raw_object_name(
+        bidding_zone="10YFR-RTE------C",
+        period_start=datetime(2026, 8, 20, 2, 0, tzinfo=utc_plus_two),
+        period_end=datetime(2026, 8, 20, 3, 0, tzinfo=utc_plus_two),
+    )
+
+    assert object_name == (
+        "entsoe/day_ahead_prices/"
+        "bidding_zone=10YFR-RTE------C/"
+        "year=2026/"
+        "month=08/"
+        "day=20/"
+        "20260820T0000Z_20260820T0100Z.xml"
+    )
+
+
+def test_build_day_ahead_price_raw_object_name_rejects_invalid_interval() -> None:
+    from european_energy_data_platform.entsoe import (
+        build_day_ahead_price_raw_object_name,
+    )
+
+    period_start = datetime(2026, 8, 20, 0, 0, tzinfo=UTC)
+
+    with pytest.raises(ValueError, match="period_end must be after period_start"):
+        build_day_ahead_price_raw_object_name(
+            bidding_zone="10YFR-RTE------C",
+            period_start=period_start,
+            period_end=period_start,
+        )
+
+
+def test_build_actual_load_params_rejects_naive_period_start() -> None:
+    from european_energy_data_platform.entsoe import build_actual_load_params
+
+    with pytest.raises(ValueError, match="period_start must be timezone-aware"):
+        build_actual_load_params(
+            bidding_zone="10YFR-RTE------C",
+            period_start=datetime(2026, 8, 20, 0, 0, tzinfo=UTC).replace(tzinfo=None),
+            period_end=datetime(2026, 8, 20, 1, 0, tzinfo=UTC),
+        )
+
+
+def test_build_day_ahead_price_params_rejects_naive_period_end() -> None:
+    from european_energy_data_platform.entsoe import build_day_ahead_price_params
+
+    with pytest.raises(ValueError, match="period_end must be timezone-aware"):
+        build_day_ahead_price_params(
+            bidding_zone="10YFR-RTE------C",
+            period_start=datetime(2026, 8, 20, 0, 0, tzinfo=UTC),
+            period_end=datetime(2026, 8, 20, 1, 0, tzinfo=UTC).replace(tzinfo=None),
+        )
+
+
+def test_entsoe_client_default_session_configures_retries() -> None:
+    from european_energy_data_platform.entsoe import (
+        ENTSOE_API_URL,
+        ENTSOE_RETRY_BACKOFF_FACTOR,
+        ENTSOE_RETRY_STATUS_CODES,
+        ENTSOE_RETRY_TOTAL,
+        EntsoeClient,
+    )
+
+    client = EntsoeClient("test-token")
+
+    try:
+        adapter = client._session.get_adapter(ENTSOE_API_URL)
+        retry = adapter.max_retries
+
+        assert retry.total == ENTSOE_RETRY_TOTAL
+        assert retry.backoff_factor == ENTSOE_RETRY_BACKOFF_FACTOR
+        assert set(retry.status_forcelist) == set(ENTSOE_RETRY_STATUS_CODES)
+        assert retry.allowed_methods == frozenset({"GET"})
+        assert retry.respect_retry_after_header is True
+        assert retry.raise_on_status is False
+    finally:
+        client._session.close()
