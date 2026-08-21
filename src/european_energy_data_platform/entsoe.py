@@ -126,6 +126,35 @@ def build_actual_generation_raw_object_name(
     )
 
 
+def build_day_ahead_price_raw_object_name(
+    bidding_zone: str,
+    period_start: datetime,
+    period_end: datetime,
+) -> str:
+    """Build a deterministic RAW object name for Day-Ahead Prices XML."""
+    if period_start.tzinfo is None or period_start.utcoffset() is None:
+        raise ValueError("period_start must be timezone-aware")
+
+    if period_end.tzinfo is None or period_end.utcoffset() is None:
+        raise ValueError("period_end must be timezone-aware")
+
+    if period_end <= period_start:
+        raise ValueError("period_end must be after period_start")
+
+    period_start_utc = period_start.astimezone(UTC)
+    period_end_utc = period_end.astimezone(UTC)
+
+    return (
+        "entsoe/day_ahead_prices/"
+        f"bidding_zone={bidding_zone}/"
+        f"year={period_start_utc:%Y}/"
+        f"month={period_start_utc:%m}/"
+        f"day={period_start_utc:%d}/"
+        f"{period_start_utc:%Y%m%dT%H%MZ}_"
+        f"{period_end_utc:%Y%m%dT%H%MZ}.xml"
+    )
+
+
 ENTSOE_API_URL = "https://web-api.tp.entsoe.eu/api"
 ENTSOE_DEFAULT_TIMEOUT_SECONDS = 30.0
 
