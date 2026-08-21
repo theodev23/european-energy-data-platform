@@ -181,6 +181,22 @@ class EntsoeClient:
         self._session = session or requests.Session()
         self._timeout = timeout
 
+    def _fetch_xml(self, params: dict[str, str]) -> bytes:
+        """Execute an authenticated ENTSO-E request and return raw XML."""
+        request_params = {
+            **params,
+            "securityToken": self._security_token,
+        }
+
+        response = self._session.get(
+            ENTSOE_API_URL,
+            params=request_params,
+            timeout=self._timeout,
+        )
+        response.raise_for_status()
+
+        return response.content
+
     def fetch_actual_load(
         self,
         bidding_zone: str,
@@ -193,16 +209,8 @@ class EntsoeClient:
             period_start=period_start,
             period_end=period_end,
         )
-        params["securityToken"] = self._security_token
 
-        response = self._session.get(
-            ENTSOE_API_URL,
-            params=params,
-            timeout=self._timeout,
-        )
-        response.raise_for_status()
-
-        return response.content
+        return self._fetch_xml(params)
 
     def fetch_actual_generation(
         self,
@@ -216,16 +224,8 @@ class EntsoeClient:
             period_start=period_start,
             period_end=period_end,
         )
-        params["securityToken"] = self._security_token
 
-        response = self._session.get(
-            ENTSOE_API_URL,
-            params=params,
-            timeout=self._timeout,
-        )
-        response.raise_for_status()
-
-        return response.content
+        return self._fetch_xml(params)
 
     def fetch_day_ahead_prices(
         self,
@@ -239,13 +239,5 @@ class EntsoeClient:
             period_start=period_start,
             period_end=period_end,
         )
-        params["securityToken"] = self._security_token
 
-        response = self._session.get(
-            ENTSOE_API_URL,
-            params=params,
-            timeout=self._timeout,
-        )
-        response.raise_for_status()
-
-        return response.content
+        return self._fetch_xml(params)
