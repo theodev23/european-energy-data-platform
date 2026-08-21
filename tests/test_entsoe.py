@@ -380,3 +380,28 @@ def test_build_day_ahead_price_params_rejects_naive_period_end() -> None:
             period_start=datetime(2026, 8, 20, 0, 0, tzinfo=UTC),
             period_end=datetime(2026, 8, 20, 1, 0, tzinfo=UTC).replace(tzinfo=None),
         )
+
+
+def test_entsoe_client_default_session_configures_retries() -> None:
+    from european_energy_data_platform.entsoe import (
+        ENTSOE_API_URL,
+        ENTSOE_RETRY_BACKOFF_FACTOR,
+        ENTSOE_RETRY_STATUS_CODES,
+        ENTSOE_RETRY_TOTAL,
+        EntsoeClient,
+    )
+
+    client = EntsoeClient("test-token")
+
+    try:
+        adapter = client._session.get_adapter(ENTSOE_API_URL)
+        retry = adapter.max_retries
+
+        assert retry.total == ENTSOE_RETRY_TOTAL
+        assert retry.backoff_factor == ENTSOE_RETRY_BACKOFF_FACTOR
+        assert set(retry.status_forcelist) == set(ENTSOE_RETRY_STATUS_CODES)
+        assert retry.allowed_methods == frozenset({"GET"})
+        assert retry.respect_retry_after_header is True
+        assert retry.raise_on_status is False
+    finally:
+        client._session.close()

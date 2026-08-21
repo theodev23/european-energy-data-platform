@@ -1,6 +1,8 @@
 from datetime import UTC, datetime
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 ENTSOE_DATETIME_FORMAT = "%Y%m%d%H%M"
 
@@ -161,6 +163,29 @@ def build_day_ahead_price_raw_object_name(
 
 ENTSOE_API_URL = "https://web-api.tp.entsoe.eu/api"
 ENTSOE_DEFAULT_TIMEOUT_SECONDS = 30.0
+ENTSOE_RETRY_TOTAL = 2
+ENTSOE_RETRY_BACKOFF_FACTOR = 0.5
+ENTSOE_RETRY_STATUS_CODES = (429, 500, 502, 503, 504)
+
+
+def _build_retry_session() -> requests.Session:
+    """Build the default HTTP session with bounded retries."""
+    retry = Retry(
+        total=ENTSOE_RETRY_TOTAL,
+        backoff_factor=ENTSOE_RETRY_BACKOFF_FACTOR,
+        status_forcelist=ENTSOE_RETRY_STATUS_CODES,
+        allowed_methods=frozenset({"GET"}),
+        respect_retry_after_header=True,
+        raise_on_status=False,
+    )
+
+    session = requests.Session()
+    session.mount(
+        "https://",
+        HTTPAdapter(max_retries=retry),
+    )
+
+    return session
 
 
 class EntsoeClient:
@@ -178,7 +203,7 @@ class EntsoeClient:
             raise ValueError("ENTSO-E security token must not be empty")
 
         self._security_token = security_token
-        self._session = session or requests.Session()
+        self._session = session if session is not None else _build_retry_session()
         self._timeout = timeout
 
     def _fetch_xml(self, params: dict[str, str]) -> bytes:
