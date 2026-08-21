@@ -169,3 +169,44 @@ def test_build_actual_generation_params_rejects_invalid_interval() -> None:
             period_start=period_start,
             period_end=period_start,
         )
+
+
+def test_entsoe_client_fetches_actual_generation_xml() -> None:
+    from unittest.mock import Mock
+
+    from european_energy_data_platform.entsoe import EntsoeClient
+
+    session = Mock()
+    response = Mock()
+    response.content = b"<GL_MarketDocument />"
+    session.get.return_value = response
+
+    client = EntsoeClient(
+        security_token="test-token",
+        session=session,
+        timeout=30.0,
+    )
+
+    result = client.fetch_actual_generation(
+        bidding_zone="10YFR-RTE------C",
+        period_start=datetime(2026, 8, 20, 0, 0, tzinfo=UTC),
+        period_end=datetime(2026, 8, 20, 1, 0, tzinfo=UTC),
+    )
+
+    assert result == b"<GL_MarketDocument />"
+
+    expected_url = "https:" + "//web-api.tp.entsoe.eu/api"
+
+    session.get.assert_called_once_with(
+        expected_url,
+        params={
+            "documentType": "A75",
+            "processType": "A16",
+            "in_Domain": "10YFR-RTE------C",
+            "periodStart": "202608200000",
+            "periodEnd": "202608200100",
+            "securityToken": "test-token",
+        },
+        timeout=30.0,
+    )
+    response.raise_for_status.assert_called_once_with()

@@ -122,3 +122,26 @@ class EntsoeClient:
         response.raise_for_status()
 
         return response.content
+
+    def fetch_actual_generation(
+        self,
+        bidding_zone: str,
+        period_start: datetime,
+        period_end: datetime,
+    ) -> bytes:
+        """Fetch raw Actual Generation per Production Type XML from ENTSO-E."""
+        params = build_actual_generation_params(
+            bidding_zone=bidding_zone,
+            period_start=period_start,
+            period_end=period_end,
+        )
+        params["securityToken"] = self._security_token
+
+        response = self._session.get(
+            ENTSOE_API_URL,
+            params=params,
+            timeout=self._timeout,
+        )
+        response.raise_for_status()
+
+        return response.content
