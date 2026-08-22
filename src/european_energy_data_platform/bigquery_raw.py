@@ -85,6 +85,64 @@ DAY_AHEAD_PRICES_SCHEMA = (
 )
 
 
+def build_raw_dataset(
+    project_id: str,
+    *,
+    dataset_id: str = "entsoe_raw",
+    location: str = "EU",
+) -> bigquery.Dataset:
+    dataset = bigquery.Dataset(f"{project_id}.{dataset_id}")
+    dataset.location = location
+    return dataset
+
+
+def build_raw_tables(
+    project_id: str,
+    *,
+    dataset_id: str = "entsoe_raw",
+) -> tuple[bigquery.Table, ...]:
+    table_definitions = (
+        (
+            "actual_load",
+            ACTUAL_LOAD_SCHEMA,
+            ["out_bidding_zone"],
+        ),
+        (
+            "actual_generation",
+            ACTUAL_GENERATION_SCHEMA,
+            [
+                "in_bidding_zone",
+                "out_bidding_zone",
+                "psr_type",
+            ],
+        ),
+        (
+            "day_ahead_prices",
+            DAY_AHEAD_PRICES_SCHEMA,
+            [
+                "in_domain",
+                "out_domain",
+            ],
+        ),
+    )
+
+    tables = []
+
+    for table_id, schema, clustering_fields in table_definitions:
+        table = bigquery.Table(
+            f"{project_id}.{dataset_id}.{table_id}",
+            schema=list(schema),
+        )
+        table.time_partitioning = bigquery.TimePartitioning(
+            type_=bigquery.TimePartitioningType.DAY,
+            field="point_timestamp",
+        )
+        table.clustering_fields = clustering_fields
+        tables.append(table)
+
+    return tuple(tables)
+
+
 def _json_value(value):
     if isinstance(value, datetime):
         return value.isoformat()
