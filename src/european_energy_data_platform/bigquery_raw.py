@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import asdict
 from datetime import datetime
 from decimal import Decimal
@@ -182,6 +183,25 @@ def _row_to_json(row) -> dict:
     return {key: _json_value(value) for key, value in asdict(row).items()}
 
 
+RawRow = ActualLoadRawRow | ActualGenerationRawRow | DayAheadPriceRawRow
+
+
+def _source_object_name(
+    rows: Sequence[RawRow],
+    *,
+    label: str,
+) -> str:
+    if not rows:
+        raise ValueError(f"{label} rows must not be empty")
+
+    source_object_name = rows[0].source_object_name
+
+    if any(row.source_object_name != source_object_name for row in rows[1:]):
+        raise ValueError(f"{label} rows must use the same source_object_name")
+
+    return source_object_name
+
+
 class BigQueryRawLoader:
     """Load parsed ENTSO-E RAW rows into BigQuery."""
 
@@ -230,10 +250,10 @@ class BigQueryRawLoader:
         self,
         rows: list[ActualLoadRawRow],
     ) -> None:
-        if not rows:
-            raise ValueError("Actual Load rows must not be empty")
-
-        source_object_name = rows[0].source_object_name
+        source_object_name = _source_object_name(
+            rows,
+            label="Actual Load",
+        )
         source_hash = sha256(source_object_name.encode()).hexdigest()[:24]
 
         destination = f"{self._client.project}.{self._dataset_id}.actual_load"
@@ -249,10 +269,10 @@ class BigQueryRawLoader:
         self,
         rows: list[ActualGenerationRawRow],
     ) -> None:
-        if not rows:
-            raise ValueError("Actual Generation rows must not be empty")
-
-        source_object_name = rows[0].source_object_name
+        source_object_name = _source_object_name(
+            rows,
+            label="Actual Generation",
+        )
         source_hash = sha256(source_object_name.encode()).hexdigest()[:24]
 
         destination = f"{self._client.project}.{self._dataset_id}.actual_generation"
@@ -268,10 +288,10 @@ class BigQueryRawLoader:
         self,
         rows: list[DayAheadPriceRawRow],
     ) -> None:
-        if not rows:
-            raise ValueError("Day-Ahead Price rows must not be empty")
-
-        source_object_name = rows[0].source_object_name
+        source_object_name = _source_object_name(
+            rows,
+            label="Day-Ahead Price",
+        )
         source_hash = sha256(source_object_name.encode()).hexdigest()[:24]
 
         destination = f"{self._client.project}.{self._dataset_id}.day_ahead_prices"

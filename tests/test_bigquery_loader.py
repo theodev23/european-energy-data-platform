@@ -1,6 +1,8 @@
+from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
 
+import pytest
 from google.cloud import bigquery
 
 from european_energy_data_platform.ingestion import RawPayload
@@ -274,3 +276,93 @@ def test_load_actual_load_reuses_existing_job_on_conflict() -> None:
         }
     ]
     assert client.job.result_call_count == 1
+
+
+def test_load_actual_load_rejects_rows_from_multiple_source_objects() -> None:
+    from european_energy_data_platform.bigquery_raw import BigQueryRawLoader
+
+    payload = RawPayload(
+        object_name=(
+            "entsoe/actual_load/"
+            "bidding_zone=10YFR-RTE------C/"
+            "year=2026/month=08/day=20/"
+            "20260820T0000Z_20260820T0100Z.xml"
+        ),
+        content=Path("tests/fixtures/actual_load.xml").read_bytes(),
+    )
+    rows = parse_actual_load(payload)
+    rows[1] = replace(
+        rows[1],
+        source_object_name="entsoe/actual_load/other-source.xml",
+    )
+
+    client = FakeBigQueryClient()
+    loader = BigQueryRawLoader(client=client)
+
+    with pytest.raises(
+        ValueError,
+        match="same source_object_name",
+    ):
+        loader.load_actual_load(rows)
+
+    assert client.calls == []
+
+
+def test_load_actual_generation_rejects_rows_from_multiple_source_objects() -> None:
+    from european_energy_data_platform.bigquery_raw import BigQueryRawLoader
+
+    payload = RawPayload(
+        object_name=(
+            "entsoe/actual_generation/"
+            "bidding_zone=10YFR-RTE------C/"
+            "year=2026/month=08/day=20/"
+            "20260820T0000Z_20260820T0100Z.xml"
+        ),
+        content=Path("tests/fixtures/actual_generation.xml").read_bytes(),
+    )
+    rows = parse_actual_generation(payload)
+    rows[1] = replace(
+        rows[1],
+        source_object_name="entsoe/actual_generation/other-source.xml",
+    )
+
+    client = FakeBigQueryClient()
+    loader = BigQueryRawLoader(client=client)
+
+    with pytest.raises(
+        ValueError,
+        match="same source_object_name",
+    ):
+        loader.load_actual_generation(rows)
+
+    assert client.calls == []
+
+
+def test_load_day_ahead_prices_rejects_rows_from_multiple_source_objects() -> None:
+    from european_energy_data_platform.bigquery_raw import BigQueryRawLoader
+
+    payload = RawPayload(
+        object_name=(
+            "entsoe/day_ahead_prices/"
+            "bidding_zone=10YFR-RTE------C/"
+            "year=2026/month=08/day=20/"
+            "20260820T0000Z_20260820T0100Z.xml"
+        ),
+        content=Path("tests/fixtures/day_ahead_prices.xml").read_bytes(),
+    )
+    rows = parse_day_ahead_prices(payload)
+    rows[1] = replace(
+        rows[1],
+        source_object_name="entsoe/day_ahead_prices/other-source.xml",
+    )
+
+    client = FakeBigQueryClient()
+    loader = BigQueryRawLoader(client=client)
+
+    with pytest.raises(
+        ValueError,
+        match="same source_object_name",
+    ):
+        loader.load_day_ahead_prices(rows)
+
+    assert client.calls == []
