@@ -41,18 +41,66 @@ flowchart TD
 
 The ingestion layer is responsible for:
 
-- calling the ENTSO-E API;
-- accepting explicit date parameters;
-- handling API errors and retries;
-- validating source responses;
-- preserving raw source payloads;
-- producing deterministic output paths.
+- calling the ENTSO-E API for actual load, actual generation, and day-ahead prices;
+
+- accepting explicit timezone-aware logical intervals;
+
+- normalizing pipeline timestamps to UTC;
+
+- validating request periods;
+
+- applying bounded retries to transient HTTP failures;
+
+- preserving the original XML response as bytes;
+
+- producing deterministic RAW object paths.
+
+Each extraction function returns an immutable `RawPayload` containing:
+
+- `object_name`: the deterministic GCS object path;
+
+- `content`: the unmodified source XML bytes.
+
+This keeps extraction independent from cloud persistence and makes both layers directly testable.
 
 ### Google Cloud Storage
 
-Google Cloud Storage is the raw landing zone.
+Google Cloud Storage is the immutable RAW landing zone.
 
-Raw source payloads are preserved before transformation so that historical data can be reprocessed without unnecessarily calling the external API again.
+The current bucket configuration uses:
+
+- the `EU` multi-region;
+
+- the `STANDARD` storage class;
+
+- uniform bucket-level access;
+
+- enforced public access prevention;
+
+- a seven-day soft delete policy.
+
+Objects use deterministic paths based on dataset, bidding zone, and logical interval:
+
+```text
+entsoe/{dataset}/bidding_zone={zone}/year=YYYY/month=MM/day=DD/
+YYYYMMDDTHHMMZ_YYYYMMDDTHHMMZ.xml
+```
+
+RAW writes use the GCS precondition `if_generation_match=0`.
+
+This means:
+
+- the first run creates the object;
+
+- a rerun for the same logical interval does not overwrite it;
+
+- the first stored source payload is preserved;
+
+- retries and backfills remain idempotent at the RAW storage layer.
+
+The storage operation reports whether the object was created or already existed.
+
+Real end-to-end smoke tests have validated this behavior for all three MVP datasets.
 
 ### BigQuery RAW
 
@@ -108,15 +156,25 @@ This enables:
 
 Pipeline runs must be safe to execute more than once for the same logical interval.
 
-The project will use:
+The RAW layer currently guarantees idempotence through:
 
-- deterministic raw object paths;
 - explicit logical dates;
-- stable business keys;
-- controlled BigQuery loading strategies;
-- dbt incremental or merge-based models where appropriate.
 
-The precise implementation will be defined when each pipeline layer is developed.
+- deterministic GCS object paths;
+
+- create-only uploads using `if_generation_match=0`;
+
+- treating an existing deterministic object as a successful no-op instead of overwriting it.
+
+A real GCS rerun test confirmed that the object generation and size remain unchanged when the same interval is processed again.
+
+Future layers will extend this strategy with:
+
+- stable business keys;
+
+- controlled BigQuery loading strategies;
+
+- dbt incremental or merge-based models where appropriate.
 
 ## Time handling
 
@@ -133,7 +191,15 @@ Source resolution and time intervals must be preserved explicitly because Europe
 
 No API token, Google Cloud credential, service-account key, or local secret may be committed to Git.
 
-Local configuration templates may be versioned through files such as `.env.example`, but real values must remain outside the repository.
+Local configuration templates may be versioned through `.env.example`, but real values remain in the ignored local `.env` file.
+
+Local Google Cloud development uses Application Default Credentials created outside the repository with:
+
+```bash
+gcloud auth application-default login
+```
+
+The GCS RAW bucket additionally enforces public access prevention and uniform bucket-level access.
 
 ## Out of scope for the initial MVP
 
