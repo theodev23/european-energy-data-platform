@@ -1,0 +1,92 @@
+from hashlib import sha256
+from pathlib import Path
+
+from google.cloud import bigquery
+
+from european_energy_data_platform.ingestion import RawPayload
+from european_energy_data_platform.parsing import parse_actual_load
+
+
+class FakeLoadJob:
+    def __init__(self) -> None:
+        self.result_call_count = 0
+
+    def result(self) -> None:
+        self.result_call_count += 1
+
+
+class FakeBigQueryClient:
+    project = "european-energy-data-td26"
+
+    def __init__(self) -> None:
+        self.calls = []
+        self.job = FakeLoadJob()
+
+    def load_table_from_json(
+        self,
+        json_rows,
+        destination,
+        *,
+        job_id,
+        job_config,
+        location,
+    ):
+        self.calls.append(
+            {
+                "json_rows": json_rows,
+                "destination": destination,
+                "job_id": job_id,
+                "job_config": job_config,
+                "location": location,
+            }
+        )
+        return self.job
+
+
+def test_load_actual_load_uses_deterministic_bigquery_load_job() -> None:
+    from european_energy_data_platform.bigquery_raw import BigQueryRawLoader
+
+    payload = RawPayload(
+        object_name=(
+            "entsoe/actual_load/"
+            "bidding_zone=10YFR-RTE------C/"
+            "year=2026/month=08/day=20/"
+            "20260820T0000Z_20260820T0100Z.xml"
+        ),
+        content=Path("tests/fixtures/actual_load.xml").read_bytes(),
+    )
+    rows = parse_actual_load(payload)
+
+    client = FakeBigQueryClient()
+    loader = BigQueryRawLoader(client=client)
+
+    loader.load_actual_load(rows)
+
+    assert len(client.calls) == 1
+
+    call = client.calls[0]
+
+    assert call["destination"] == ("european-energy-data-td26.entsoe_raw.actual_load")
+    assert call["location"] == "EU"
+
+    expected_hash = sha256(payload.object_name.encode()).hexdigest()[:24]
+    assert call["job_id"] == f"raw_actual_load_{expected_hash}"
+
+    job_config = call["job_config"]
+
+    assert job_config.write_disposition == bigquery.WriteDisposition.WRITE_APPEND
+    assert job_config.create_disposition == bigquery.CreateDisposition.CREATE_NEVER
+
+    assert len(call["json_rows"]) == len(rows)
+
+    first_json_row = call["json_rows"][0]
+    first_source_row = rows[0]
+
+    assert first_json_row["source_object_name"] == payload.object_name
+    assert first_json_row["document_created_at"] == (
+        first_source_row.document_created_at.isoformat()
+    )
+    assert first_json_row["point_timestamp"] == (first_source_row.point_timestamp.isoformat())
+    assert first_json_row["quantity"] == str(first_source_row.quantity)
+
+    assert client.job.result_call_count == 1

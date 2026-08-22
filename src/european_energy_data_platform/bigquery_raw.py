@@ -1,4 +1,11 @@
+from dataclasses import asdict
+from datetime import datetime
+from decimal import Decimal
+from hashlib import sha256
+
 from google.cloud import bigquery
+
+from european_energy_data_platform.parsing import ActualLoadRawRow
 
 ACTUAL_LOAD_SCHEMA = (
     bigquery.SchemaField("source_object_name", "STRING", mode="REQUIRED"),
@@ -72,3 +79,57 @@ DAY_AHEAD_PRICES_SCHEMA = (
     bigquery.SchemaField("point_timestamp", "TIMESTAMP", mode="REQUIRED"),
     bigquery.SchemaField("price_amount", "NUMERIC", mode="REQUIRED"),
 )
+
+
+def _json_value(value):
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return str(value)
+    return value
+
+
+def _row_to_json(row) -> dict:
+    return {key: _json_value(value) for key, value in asdict(row).items()}
+
+
+class BigQueryRawLoader:
+    """Load parsed ENTSO-E RAW rows into BigQuery."""
+
+    def __init__(
+        self,
+        client: bigquery.Client,
+        *,
+        dataset_id: str = "entsoe_raw",
+        location: str = "EU",
+    ) -> None:
+        self._client = client
+        self._dataset_id = dataset_id
+        self._location = location
+
+    def load_actual_load(
+        self,
+        rows: list[ActualLoadRawRow],
+    ) -> None:
+        if not rows:
+            raise ValueError("Actual Load rows must not be empty")
+
+        source_object_name = rows[0].source_object_name
+        source_hash = sha256(source_object_name.encode()).hexdigest()[:24]
+
+        destination = f"{self._client.project}.{self._dataset_id}.actual_load"
+
+        job_config = bigquery.LoadJobConfig(
+            schema=ACTUAL_LOAD_SCHEMA,
+            write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+            create_disposition=bigquery.CreateDisposition.CREATE_NEVER,
+        )
+
+        job = self._client.load_table_from_json(
+            [_row_to_json(row) for row in rows],
+            destination,
+            job_id=f"raw_actual_load_{source_hash}",
+            job_config=job_config,
+            location=self._location,
+        )
+        job.result()
