@@ -8,6 +8,7 @@ from google.cloud import bigquery
 from european_energy_data_platform.parsing import (
     ActualGenerationRawRow,
     ActualLoadRawRow,
+    DayAheadPriceRawRow,
 )
 
 ACTUAL_LOAD_SCHEMA = (
@@ -159,6 +160,33 @@ class BigQueryRawLoader:
             [_row_to_json(row) for row in rows],
             destination,
             job_id=f"raw_actual_generation_{source_hash}",
+            job_config=job_config,
+            location=self._location,
+        )
+        job.result()
+
+    def load_day_ahead_prices(
+        self,
+        rows: list[DayAheadPriceRawRow],
+    ) -> None:
+        if not rows:
+            raise ValueError("Day-Ahead Price rows must not be empty")
+
+        source_object_name = rows[0].source_object_name
+        source_hash = sha256(source_object_name.encode()).hexdigest()[:24]
+
+        destination = f"{self._client.project}.{self._dataset_id}.day_ahead_prices"
+
+        job_config = bigquery.LoadJobConfig(
+            schema=DAY_AHEAD_PRICES_SCHEMA,
+            write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+            create_disposition=bigquery.CreateDisposition.CREATE_NEVER,
+        )
+
+        job = self._client.load_table_from_json(
+            [_row_to_json(row) for row in rows],
+            destination,
+            job_id=f"raw_day_ahead_prices_{source_hash}",
             job_config=job_config,
             location=self._location,
         )
