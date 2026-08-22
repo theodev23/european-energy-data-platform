@@ -57,6 +57,32 @@ class ActualGenerationRawRow:
     quantity: Decimal
 
 
+@dataclass(frozen=True, slots=True)
+class DayAheadPriceRawRow:
+    """One source-aligned ENTSO-E Day-Ahead Price point."""
+
+    source_object_name: str
+    document_mrid: str
+    document_type: str
+    revision_number: int
+    document_created_at: datetime
+    time_series_mrid: str
+    auction_type: str
+    business_type: str
+    in_domain: str
+    out_domain: str
+    contract_market_agreement_type: str
+    currency_unit: str
+    price_unit: str
+    curve_type: str
+    period_start: datetime
+    period_end: datetime
+    resolution: str
+    position: int
+    point_timestamp: datetime
+    price_amount: Decimal
+
+
 def _local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
@@ -271,6 +297,101 @@ def parse_actual_generation(payload: RawPayload) -> list[ActualGenerationRawRow]
                         position=position,
                         point_timestamp=(period_start + resolution_delta * (position - 1)),
                         quantity=quantity,
+                    )
+                )
+
+    return rows
+
+
+def parse_day_ahead_prices(payload: RawPayload) -> list[DayAheadPriceRawRow]:
+    """Parse ENTSO-E Day-Ahead Price XML into point-level RAW rows."""
+    root = ET.fromstring(payload.content)
+
+    document_mrid = _required_text(root, "mRID")
+    document_type = _required_text(root, "type")
+    revision_number = int(_required_text(root, "revisionNumber"))
+    document_created_at = _parse_datetime(_required_text(root, "createdDateTime"))
+
+    rows: list[DayAheadPriceRawRow] = []
+
+    for time_series in root:
+        if _local_name(time_series.tag) != "TimeSeries":
+            continue
+
+        time_series_mrid = _required_text(time_series, "mRID")
+        auction_type = _required_text(time_series, "auction.type")
+        business_type = _required_text(time_series, "businessType")
+        in_domain = _required_text(time_series, "in_Domain.mRID")
+        out_domain = _required_text(time_series, "out_Domain.mRID")
+        contract_market_agreement_type = _required_text(
+            time_series,
+            "contract_MarketAgreement.type",
+        )
+        currency_unit = _required_text(
+            time_series,
+            "currency_Unit.name",
+        )
+        price_unit = _required_text(
+            time_series,
+            "price_Measure_Unit.name",
+        )
+        curve_type = _required_text(time_series, "curveType")
+
+        for period in time_series:
+            if _local_name(period.tag) != "Period":
+                continue
+
+            time_interval = next(
+                (
+                    child
+                    for child in period
+                    if _local_name(child.tag) in {"timeInterval", "period.timeInterval"}
+                ),
+                None,
+            )
+
+            if time_interval is None:
+                raise ValueError(
+                    "Missing required XML element: timeInterval or period.timeInterval"
+                )
+
+            period_start = _parse_datetime(_required_text(time_interval, "start"))
+            period_end = _parse_datetime(_required_text(time_interval, "end"))
+            resolution = _required_text(period, "resolution")
+            resolution_delta = _parse_resolution(resolution)
+
+            for point in period:
+                if _local_name(point.tag) != "Point":
+                    continue
+
+                position = int(_required_text(point, "position"))
+                price_amount = Decimal(_required_text(point, "price.amount"))
+
+                if position < 1:
+                    raise ValueError("ENTSO-E point position must be positive")
+
+                rows.append(
+                    DayAheadPriceRawRow(
+                        source_object_name=payload.object_name,
+                        document_mrid=document_mrid,
+                        document_type=document_type,
+                        revision_number=revision_number,
+                        document_created_at=document_created_at,
+                        time_series_mrid=time_series_mrid,
+                        auction_type=auction_type,
+                        business_type=business_type,
+                        in_domain=in_domain,
+                        out_domain=out_domain,
+                        contract_market_agreement_type=(contract_market_agreement_type),
+                        currency_unit=currency_unit,
+                        price_unit=price_unit,
+                        curve_type=curve_type,
+                        period_start=period_start,
+                        period_end=period_end,
+                        resolution=resolution,
+                        position=position,
+                        point_timestamp=(period_start + resolution_delta * (position - 1)),
+                        price_amount=price_amount,
                     )
                 )
 
