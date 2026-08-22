@@ -143,6 +143,32 @@ def build_raw_tables(
     return tuple(tables)
 
 
+def provision_raw_infrastructure(
+    client: bigquery.Client,
+    *,
+    dataset_id: str = "entsoe_raw",
+    location: str = "EU",
+) -> None:
+    dataset = build_raw_dataset(
+        client.project,
+        dataset_id=dataset_id,
+        location=location,
+    )
+    client.create_dataset(
+        dataset,
+        exists_ok=True,
+    )
+
+    for table in build_raw_tables(
+        client.project,
+        dataset_id=dataset_id,
+    ):
+        client.create_table(
+            table,
+            exists_ok=True,
+        )
+
+
 def _json_value(value):
     if isinstance(value, datetime):
         return value.isoformat()

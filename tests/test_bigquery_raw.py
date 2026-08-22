@@ -129,3 +129,62 @@ def test_raw_bigquery_infrastructure_contract() -> None:
         "in_domain",
         "out_domain",
     ]
+
+
+class FakeBigQueryAdminClient:
+    project = "european-energy-data-td26"
+
+    def __init__(self) -> None:
+        self.dataset_calls = []
+        self.table_calls = []
+
+    def create_dataset(self, dataset, *, exists_ok):
+        self.dataset_calls.append(
+            {
+                "dataset": dataset,
+                "exists_ok": exists_ok,
+            }
+        )
+        return dataset
+
+    def create_table(self, table, *, exists_ok):
+        self.table_calls.append(
+            {
+                "table": table,
+                "exists_ok": exists_ok,
+            }
+        )
+        return table
+
+
+def test_provision_raw_infrastructure_creates_dataset_and_tables_idempotently() -> None:
+    from european_energy_data_platform.bigquery_raw import (
+        provision_raw_infrastructure,
+    )
+
+    client = FakeBigQueryAdminClient()
+
+    provision_raw_infrastructure(client)
+
+    assert len(client.dataset_calls) == 1
+
+    dataset_call = client.dataset_calls[0]
+
+    assert dataset_call["dataset"].project == client.project
+    assert dataset_call["dataset"].dataset_id == "entsoe_raw"
+    assert dataset_call["dataset"].location == "EU"
+    assert dataset_call["exists_ok"] is True
+
+    assert len(client.table_calls) == 3
+
+    table_ids = [call["table"].table_id for call in client.table_calls]
+
+    assert table_ids == [
+        "actual_load",
+        "actual_generation",
+        "day_ahead_prices",
+    ]
+
+    assert all(call["table"].project == client.project for call in client.table_calls)
+    assert all(call["table"].dataset_id == "entsoe_raw" for call in client.table_calls)
+    assert all(call["exists_ok"] is True for call in client.table_calls)
