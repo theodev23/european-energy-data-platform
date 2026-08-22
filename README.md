@@ -85,29 +85,41 @@ Optional technologies will only be introduced if they add clear architectural or
 
 ## Current status
 
-Project foundation is in progress.
+The project currently implements the source ingestion and cloud RAW landing-zone layers.
 
 Implemented so far:
 
-- Git repository and feature-branch workflow;
-- Python `src/` package layout;
-- explicit Python build configuration;
-- isolated virtual environment;
-- pytest configuration and package import smoke test;
-- Ruff linting and formatting;
-- `.gitignore` for local artifacts, credentials, Airflow, dbt, and Terraform;
-- `.env.example` for the ENTSO-E API token;
-- initial architecture documentation.
+- Git repository with feature-branch, pull-request, and CI workflow;
+- Python `src/` package layout and explicit build configuration;
+- ENTSO-E Web API client for:
+  - actual total load;
+  - actual generation by production type;
+  - day-ahead prices;
+- timezone-aware UTC request periods and validation;
+- bounded HTTP retries for transient ENTSO-E failures;
+- deterministic RAW object naming by dataset, bidding zone, and logical interval;
+- extraction functions returning immutable `RawPayload` objects;
+- Google Cloud Storage RAW persistence through the official Python SDK;
+- create-only GCS writes using `if_generation_match=0`;
+- idempotent reruns that preserve the first stored RAW payload;
+- Application Default Credentials for local Google Cloud authentication;
+- a secured GCS RAW bucket using:
+  - the `EU` multi-region;
+  - `STANDARD` storage;
+  - uniform bucket-level access;
+  - public access prevention;
+  - seven-day soft delete;
+- real end-to-end smoke tests from ENTSO-E to GCS for all three MVP datasets;
+- pytest and Ruff quality checks;
+- GitHub Actions CI on pull requests and pushes to `main`;
+- `.env.example` for local configuration without committing secrets.
 
 Not yet implemented:
 
-- ENTSO-E ingestion client;
-- raw file persistence;
-- Airflow DAGs;
-- Google Cloud resources;
-- BigQuery loading;
-- dbt models;
-- CI pipeline.
+- Apache Airflow DAGs;
+- BigQuery RAW loading;
+- dbt staging, intermediate, and marts models;
+- analytical KPIs and downstream visualization.
 
 ## Local development
 
@@ -141,11 +153,18 @@ The repository contains `.env.example` only as a configuration template:
 
 ```text
 ENTSOE_API_TOKEN=
+GCS_RAW_BUCKET=
 ```
 
 A real local `.env` file is ignored by Git.
 
-Google Cloud credentials will be configured later using an approach that avoids committing service-account keys or other sensitive material.
+Local Google Cloud authentication uses Application Default Credentials rather than a committed service-account key:
+
+```bash
+gcloud auth application-default login
+```
+
+The Python Google Cloud client libraries resolve these credentials automatically at runtime.
 
 ## Design principles
 
@@ -164,12 +183,21 @@ The project follows several core engineering principles:
 
 ```text
 .
+├── .github/
+│   └── workflows/
+│       └── ci.yml
 ├── docs/
 │   └── architecture.md
 ├── src/
 │   └── european_energy_data_platform/
-│       └── __init__.py
+│       ├── __init__.py
+│       ├── entsoe.py
+│       ├── gcs.py
+│       └── ingestion.py
 ├── tests/
+│   ├── test_entsoe.py
+│   ├── test_gcs.py
+│   ├── test_ingestion.py
 │   └── test_package.py
 ├── .env.example
 ├── .gitignore
@@ -177,4 +205,4 @@ The project follows several core engineering principles:
 └── README.md
 ```
 
-The repository structure will evolve incrementally as each pipeline component is implemented.
+The repository structure will continue to evolve incrementally as Airflow, BigQuery, and dbt are introduced.
