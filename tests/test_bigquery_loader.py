@@ -206,3 +206,71 @@ def test_load_day_ahead_prices_uses_deterministic_bigquery_load_job() -> None:
     assert second_series["price_amount"] == "164.96"
 
     assert client.job.result_call_count == 1
+
+
+class ConflictBigQueryClient(FakeBigQueryClient):
+    def __init__(self) -> None:
+        super().__init__()
+        self.get_job_calls = []
+
+    def load_table_from_json(
+        self,
+        json_rows,
+        destination,
+        *,
+        job_id,
+        job_config,
+        location,
+    ):
+        from google.api_core.exceptions import Conflict
+
+        self.calls.append(
+            {
+                "json_rows": json_rows,
+                "destination": destination,
+                "job_id": job_id,
+                "job_config": job_config,
+                "location": location,
+            }
+        )
+        raise Conflict("Job already exists")
+
+    def get_job(self, job_id, *, location):
+        self.get_job_calls.append(
+            {
+                "job_id": job_id,
+                "location": location,
+            }
+        )
+        return self.job
+
+
+def test_load_actual_load_reuses_existing_job_on_conflict() -> None:
+    from european_energy_data_platform.bigquery_raw import BigQueryRawLoader
+
+    payload = RawPayload(
+        object_name=(
+            "entsoe/actual_load/"
+            "bidding_zone=10YFR-RTE------C/"
+            "year=2026/month=08/day=20/"
+            "20260820T0000Z_20260820T0100Z.xml"
+        ),
+        content=Path("tests/fixtures/actual_load.xml").read_bytes(),
+    )
+    rows = parse_actual_load(payload)
+
+    client = ConflictBigQueryClient()
+    loader = BigQueryRawLoader(client=client)
+
+    loader.load_actual_load(rows)
+
+    expected_hash = sha256(payload.object_name.encode()).hexdigest()[:24]
+    expected_job_id = f"raw_actual_load_{expected_hash}"
+
+    assert client.get_job_calls == [
+        {
+            "job_id": expected_job_id,
+            "location": "EU",
+        }
+    ]
+    assert client.job.result_call_count == 1

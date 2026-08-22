@@ -3,6 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from hashlib import sha256
 
+from google.api_core.exceptions import Conflict
 from google.cloud import bigquery
 
 from european_energy_data_platform.parsing import (
@@ -195,6 +196,36 @@ class BigQueryRawLoader:
         self._dataset_id = dataset_id
         self._location = location
 
+    def _submit_load_job(
+        self,
+        *,
+        json_rows: list[dict],
+        destination: str,
+        job_id: str,
+        schema: tuple[bigquery.SchemaField, ...],
+    ) -> None:
+        job_config = bigquery.LoadJobConfig(
+            schema=schema,
+            write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+            create_disposition=bigquery.CreateDisposition.CREATE_NEVER,
+        )
+
+        try:
+            job = self._client.load_table_from_json(
+                json_rows,
+                destination,
+                job_id=job_id,
+                job_config=job_config,
+                location=self._location,
+            )
+        except Conflict:
+            job = self._client.get_job(
+                job_id,
+                location=self._location,
+            )
+
+        job.result()
+
     def load_actual_load(
         self,
         rows: list[ActualLoadRawRow],
@@ -207,20 +238,12 @@ class BigQueryRawLoader:
 
         destination = f"{self._client.project}.{self._dataset_id}.actual_load"
 
-        job_config = bigquery.LoadJobConfig(
-            schema=ACTUAL_LOAD_SCHEMA,
-            write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
-            create_disposition=bigquery.CreateDisposition.CREATE_NEVER,
-        )
-
-        job = self._client.load_table_from_json(
-            [_row_to_json(row) for row in rows],
-            destination,
+        self._submit_load_job(
+            json_rows=[_row_to_json(row) for row in rows],
+            destination=destination,
             job_id=f"raw_actual_load_{source_hash}",
-            job_config=job_config,
-            location=self._location,
+            schema=ACTUAL_LOAD_SCHEMA,
         )
-        job.result()
 
     def load_actual_generation(
         self,
@@ -234,20 +257,12 @@ class BigQueryRawLoader:
 
         destination = f"{self._client.project}.{self._dataset_id}.actual_generation"
 
-        job_config = bigquery.LoadJobConfig(
-            schema=ACTUAL_GENERATION_SCHEMA,
-            write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
-            create_disposition=bigquery.CreateDisposition.CREATE_NEVER,
-        )
-
-        job = self._client.load_table_from_json(
-            [_row_to_json(row) for row in rows],
-            destination,
+        self._submit_load_job(
+            json_rows=[_row_to_json(row) for row in rows],
+            destination=destination,
             job_id=f"raw_actual_generation_{source_hash}",
-            job_config=job_config,
-            location=self._location,
+            schema=ACTUAL_GENERATION_SCHEMA,
         )
-        job.result()
 
     def load_day_ahead_prices(
         self,
@@ -261,17 +276,9 @@ class BigQueryRawLoader:
 
         destination = f"{self._client.project}.{self._dataset_id}.day_ahead_prices"
 
-        job_config = bigquery.LoadJobConfig(
-            schema=DAY_AHEAD_PRICES_SCHEMA,
-            write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
-            create_disposition=bigquery.CreateDisposition.CREATE_NEVER,
-        )
-
-        job = self._client.load_table_from_json(
-            [_row_to_json(row) for row in rows],
-            destination,
+        self._submit_load_job(
+            json_rows=[_row_to_json(row) for row in rows],
+            destination=destination,
             job_id=f"raw_day_ahead_prices_{source_hash}",
-            job_config=job_config,
-            location=self._location,
+            schema=DAY_AHEAD_PRICES_SCHEMA,
         )
-        job.result()
