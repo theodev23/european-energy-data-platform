@@ -5,7 +5,10 @@ from hashlib import sha256
 
 from google.cloud import bigquery
 
-from european_energy_data_platform.parsing import ActualLoadRawRow
+from european_energy_data_platform.parsing import (
+    ActualGenerationRawRow,
+    ActualLoadRawRow,
+)
 
 ACTUAL_LOAD_SCHEMA = (
     bigquery.SchemaField("source_object_name", "STRING", mode="REQUIRED"),
@@ -129,6 +132,33 @@ class BigQueryRawLoader:
             [_row_to_json(row) for row in rows],
             destination,
             job_id=f"raw_actual_load_{source_hash}",
+            job_config=job_config,
+            location=self._location,
+        )
+        job.result()
+
+    def load_actual_generation(
+        self,
+        rows: list[ActualGenerationRawRow],
+    ) -> None:
+        if not rows:
+            raise ValueError("Actual Generation rows must not be empty")
+
+        source_object_name = rows[0].source_object_name
+        source_hash = sha256(source_object_name.encode()).hexdigest()[:24]
+
+        destination = f"{self._client.project}.{self._dataset_id}.actual_generation"
+
+        job_config = bigquery.LoadJobConfig(
+            schema=ACTUAL_GENERATION_SCHEMA,
+            write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+            create_disposition=bigquery.CreateDisposition.CREATE_NEVER,
+        )
+
+        job = self._client.load_table_from_json(
+            [_row_to_json(row) for row in rows],
+            destination,
+            job_id=f"raw_actual_generation_{source_hash}",
             job_config=job_config,
             location=self._location,
         )

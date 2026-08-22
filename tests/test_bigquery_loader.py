@@ -4,7 +4,10 @@ from pathlib import Path
 from google.cloud import bigquery
 
 from european_energy_data_platform.ingestion import RawPayload
-from european_energy_data_platform.parsing import parse_actual_load
+from european_energy_data_platform.parsing import (
+    parse_actual_generation,
+    parse_actual_load,
+)
 
 
 class FakeLoadJob:
@@ -88,5 +91,58 @@ def test_load_actual_load_uses_deterministic_bigquery_load_job() -> None:
     )
     assert first_json_row["point_timestamp"] == (first_source_row.point_timestamp.isoformat())
     assert first_json_row["quantity"] == str(first_source_row.quantity)
+
+    assert client.job.result_call_count == 1
+
+
+def test_load_actual_generation_uses_deterministic_bigquery_load_job() -> None:
+    from european_energy_data_platform.bigquery_raw import BigQueryRawLoader
+
+    payload = RawPayload(
+        object_name=(
+            "entsoe/actual_generation/"
+            "bidding_zone=10YFR-RTE------C/"
+            "year=2026/month=08/day=20/"
+            "20260820T0000Z_20260820T0100Z.xml"
+        ),
+        content=Path("tests/fixtures/actual_generation.xml").read_bytes(),
+    )
+    rows = parse_actual_generation(payload)
+
+    client = FakeBigQueryClient()
+    loader = BigQueryRawLoader(client=client)
+
+    loader.load_actual_generation(rows)
+
+    assert len(client.calls) == 1
+
+    call = client.calls[0]
+
+    assert call["destination"] == ("european-energy-data-td26.entsoe_raw.actual_generation")
+    assert call["location"] == "EU"
+
+    expected_hash = sha256(payload.object_name.encode()).hexdigest()[:24]
+    assert call["job_id"] == f"raw_actual_generation_{expected_hash}"
+
+    job_config = call["job_config"]
+
+    assert job_config.write_disposition == bigquery.WriteDisposition.WRITE_APPEND
+    assert job_config.create_disposition == bigquery.CreateDisposition.CREATE_NEVER
+
+    assert len(call["json_rows"]) == len(rows)
+
+    exported = call["json_rows"][0]
+
+    assert exported["psr_type"] == "B10"
+    assert exported["in_bidding_zone"] is None
+    assert exported["out_bidding_zone"] == "10YFR-RTE------C"
+    assert exported["quantity"] == "206.63"
+
+    imported = call["json_rows"][2]
+
+    assert imported["psr_type"] == "B10"
+    assert imported["in_bidding_zone"] == "10YFR-RTE------C"
+    assert imported["out_bidding_zone"] is None
+    assert imported["quantity"] == "174.62"
 
     assert client.job.result_call_count == 1
