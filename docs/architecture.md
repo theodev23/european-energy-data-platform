@@ -108,6 +108,42 @@ BigQuery RAW contains structured records parsed from the source payloads.
 
 This layer stays close to the source representation and provides the input datasets for dbt.
 
+The MVP uses three source-aligned tables:
+
+- `entsoe_raw.actual_load`;
+- `entsoe_raw.actual_generation`;
+- `entsoe_raw.day_ahead_prices`.
+
+The row grain is one ENTSO-E `Point` from one `Period` and one `TimeSeries`.
+
+Each row preserves enough source metadata to trace the value back to its original document,
+series, period, and immutable GCS RAW object.
+
+Common fields are expected to include:
+
+- source GCS object name;
+- document `mRID`, type, revision number, and creation timestamp;
+- TimeSeries `mRID`, business type, and curve type;
+- relevant bidding-zone or domain identifiers;
+- period start, period end, and resolution;
+- point position;
+- derived UTC point timestamp.
+
+Dataset-specific values remain source-aligned:
+
+- actual load stores quantity and quantity unit;
+- actual generation stores quantity, quantity unit, and production `psrType`;
+- day-ahead prices store price amount, currency, and price unit.
+
+RAW parsing does not deduplicate source TimeSeries and does not synthesize missing positions.
+
+If ENTSO-E provides two distinct TimeSeries identifiers with otherwise equivalent values, both are
+preserved in RAW. Any business-level deduplication belongs to a later dbt layer with an explicit,
+tested rule.
+
+Point timestamps are derived from the period start, the point position, and the declared resolution.
+A missing position therefore remains a source data gap and does not shift subsequent timestamps.
+
 ### dbt STAGING
 
 The staging layer:
