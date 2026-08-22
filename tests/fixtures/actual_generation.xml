@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GL_MarketDocument xmlns="urn:iec62325.351:tc57wg16:451-6:generationloaddocument:3:0">
+  <mRID>document-generation-1</mRID>
+  <revisionNumber>1</revisionNumber>
+  <type>A75</type>
+  <process.processType>A16</process.processType>
+  <createdDateTime>2026-08-22T08:30:47Z</createdDateTime>
+
+  <TimeSeries>
+    <mRID>series-generation-out</mRID>
+    <businessType>A01</businessType>
+    <objectAggregation>A08</objectAggregation>
+    <outBiddingZone_Domain.mRID>10YFR-RTE------C</outBiddingZone_Domain.mRID>
+    <quantity_Measure_Unit.name>MAW</quantity_Measure_Unit.name>
+    <curveType>A03</curveType>
+    <MktPSRType>
+      <psrType>B10</psrType>
+    </MktPSRType>
+
+    <Period>
+      <timeInterval>
+        <start>2026-08-20T00:00Z</start>
+        <end>2026-08-20T01:00Z</end>
+      </timeInterval>
+      <resolution>PT15M</resolution>
+
+      <Point>
+        <position>1</position>
+        <quantity>206.63</quantity>
+      </Point>
+
+      <Point>
+        <position>3</position>
+        <quantity>169.74</quantity>
+      </Point>
+    </Period>
+  </TimeSeries>
+
+  <TimeSeries>
+    <mRID>series-generation-in</mRID>
+    <businessType>A01</businessType>
+    <objectAggregation>A08</objectAggregation>
+    <inBiddingZone_Domain.mRID>10YFR-RTE------C</inBiddingZone_Domain.mRID>
+    <quantity_Measure_Unit.name>MAW</quantity_Measure_Unit.name>
+    <curveType>A03</curveType>
+    <MktPSRType>
+      <psrType>B10</psrType>
+    </MktPSRType>
+
+    <Period>
+      <timeInterval>
+        <start>2026-08-20T00:00Z</start>
+        <end>2026-08-20T01:00Z</end>
+      </timeInterval>
+      <resolution>PT15M</resolution>
+
+      <Point>
+        <position>1</position>
+        <quantity>174.62</quantity>
+      </Point>
+    </Period>
+  </TimeSeries>
+</GL_MarketDocument>

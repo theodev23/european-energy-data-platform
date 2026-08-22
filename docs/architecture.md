@@ -108,6 +108,83 @@ BigQuery RAW contains structured records parsed from the source payloads.
 
 This layer stays close to the source representation and provides the input datasets for dbt.
 
+The MVP uses three source-aligned tables:
+
+- `entsoe_raw.actual_load`;
+- `entsoe_raw.actual_generation`;
+- `entsoe_raw.day_ahead_prices`.
+
+The row grain is one ENTSO-E `Point` from one `Period` and one `TimeSeries`.
+
+Each row preserves enough source metadata to trace the value back to its original document,
+series, period, and immutable GCS RAW object.
+
+Common fields include:
+
+- source GCS object name;
+- document `mRID`, type, revision number, and creation timestamp;
+- TimeSeries `mRID`, business type, and curve type;
+- relevant bidding-zone or domain identifiers;
+- period start, period end, and resolution;
+- point position;
+- derived UTC point timestamp.
+
+Dataset-specific values remain source-aligned:
+
+- actual load stores quantity and quantity unit;
+- actual generation stores quantity, quantity unit, and production `psrType`;
+- day-ahead prices store price amount, currency, and price unit.
+
+RAW parsing does not deduplicate source TimeSeries and does not synthesize missing positions.
+
+If ENTSO-E provides two distinct TimeSeries identifiers with otherwise equivalent values, both are
+preserved in RAW. Any business-level deduplication belongs to a later dbt layer with an explicit,
+tested rule.
+
+Point timestamps are derived from the period start, the point position, and the declared resolution.
+A missing position therefore remains a source data gap and does not shift subsequent timestamps.
+
+The BigQuery RAW dataset is provisioned in the `EU` location.
+
+All three RAW tables use daily time partitioning on `point_timestamp`.
+
+Clustering is source-aligned:
+
+- `actual_load` clusters by `out_bidding_zone`;
+- `actual_generation` clusters by `in_bidding_zone`, `out_bidding_zone`, and `psr_type`;
+- `day_ahead_prices` clusters by `in_domain` and `out_domain`.
+
+Quantities and prices use BigQuery `NUMERIC` so Python `Decimal` values do not need to pass through
+binary floating-point representation.
+
+Infrastructure provisioning creates the dataset and tables with `exists_ok=True`, making repeated
+provisioning calls safe when the resources already exist.
+
+RAW records are loaded with BigQuery load jobs using:
+
+- explicit schemas;
+- `WRITE_APPEND`;
+- `CREATE_NEVER`;
+- deterministic job IDs derived from the source GCS object name;
+- the `EU` job location;
+- explicit waiting for job completion.
+
+If submission returns a `409 Conflict` for an existing deterministic job ID, the loader retrieves
+that existing job and waits for its result instead of submitting a second load.
+
+This protects normal retries and reruns while BigQuery retains the deterministic job metadata.
+It is not a permanent row-level uniqueness constraint, so later transformation layers must still
+define stable business keys where business-level deduplication is required.
+
+Real end-to-end validation loaded and queried:
+
+- 4 actual-load points;
+- 57 actual-generation points across 15 source TimeSeries;
+- 190 day-ahead-price points across two source TimeSeries.
+
+Real reruns of all three loads kept those row counts unchanged. The day-ahead-price validation also
+confirmed that the missing source position 25 remains absent rather than being synthesized.
+
 ### dbt STAGING
 
 The staging layer:
@@ -156,25 +233,29 @@ This enables:
 
 Pipeline runs must be safe to execute more than once for the same logical interval.
 
-The RAW layer currently guarantees idempotence through:
+The RAW path currently supports safe reruns through:
 
 - explicit logical dates;
-
 - deterministic GCS object paths;
+- create-only GCS uploads using `if_generation_match=0`;
+- treating an existing deterministic GCS object as a successful no-op instead of overwriting it;
+- deterministic BigQuery load job IDs derived from the immutable source object name;
+- recovering an existing BigQuery job after a `409 Conflict` and waiting for its result.
 
-- create-only uploads using `if_generation_match=0`;
+A real GCS rerun test confirmed that the object generation and size remain unchanged when the same
+interval is processed again.
 
-- treating an existing deterministic object as a successful no-op instead of overwriting it.
+Real BigQuery rerun tests confirmed unchanged row counts for all three MVP datasets:
 
-A real GCS rerun test confirmed that the object generation and size remain unchanged when the same interval is processed again.
+- actual load: 4 rows;
+- actual generation: 57 rows;
+- day-ahead prices: 190 rows.
 
-Future layers will extend this strategy with:
+The BigQuery job-ID mechanism provides retry and rerun idempotence while the deterministic job
+metadata remains available in BigQuery. It does not provide permanent row-level uniqueness.
 
-- stable business keys;
-
-- controlled BigQuery loading strategies;
-
-- dbt incremental or merge-based models where appropriate.
+Later dbt layers will extend the strategy with stable business keys and incremental or merge-based
+models where appropriate.
 
 ## Time handling
 
