@@ -35,6 +35,7 @@ airflow/webserver_config.py
 dbt_packages/
 target/
 logs/
+dbt/.user.yml
 
 # Terraform
 .terraform/
