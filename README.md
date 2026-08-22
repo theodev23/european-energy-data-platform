@@ -85,7 +85,7 @@ Optional technologies will only be introduced if they add clear architectural or
 
 ## Current status
 
-The project currently implements the source ingestion and cloud RAW landing-zone layers.
+The project currently implements the source ingestion, immutable GCS RAW landing zone, and structured BigQuery RAW loading layers.
 
 Implemented so far:
 
@@ -110,6 +110,15 @@ Implemented so far:
   - public access prevention;
   - seven-day soft delete;
 - real end-to-end smoke tests from ENTSO-E to GCS for all three MVP datasets;
+- source-aligned XML parsing into point-level RAW records for all three MVP datasets;
+- BigQuery RAW provisioning for the `entsoe_raw` dataset and three partitioned and clustered tables;
+- deterministic BigQuery load jobs using `WRITE_APPEND` and `CREATE_NEVER`;
+- BigQuery rerun handling that recovers an existing deterministic load job on conflict;
+- real BigQuery data validation with:
+  - 4 actual-load rows;
+  - 57 actual-generation rows across 15 source TimeSeries;
+  - 190 day-ahead-price rows across two source TimeSeries;
+- real BigQuery rerun validation confirming unchanged row counts for all three datasets;
 - pytest and Ruff quality checks;
 - GitHub Actions CI on pull requests and pushes to `main`;
 - `.env.example` for local configuration without committing secrets.
@@ -117,7 +126,6 @@ Implemented so far:
 Not yet implemented:
 
 - Apache Airflow DAGs;
-- BigQuery RAW loading;
 - dbt staging, intermediate, and marts models;
 - analytical KPIs and downstream visualization.
 
@@ -191,18 +199,27 @@ The project follows several core engineering principles:
 ├── src/
 │   └── european_energy_data_platform/
 │       ├── __init__.py
+│       ├── bigquery_raw.py
 │       ├── entsoe.py
 │       ├── gcs.py
-│       └── ingestion.py
+│       ├── ingestion.py
+│       └── parsing.py
 ├── tests/
+│   ├── fixtures/
+│   │   ├── actual_generation.xml
+│   │   ├── actual_load.xml
+│   │   └── day_ahead_prices.xml
+│   ├── test_bigquery_loader.py
+│   ├── test_bigquery_raw.py
 │   ├── test_entsoe.py
 │   ├── test_gcs.py
 │   ├── test_ingestion.py
-│   └── test_package.py
+│   ├── test_package.py
+│   └── test_parsing.py
 ├── .env.example
 ├── .gitignore
 ├── pyproject.toml
 └── README.md
 ```
 
-The repository structure will continue to evolve incrementally as Airflow, BigQuery, and dbt are introduced.
+The repository structure will continue to evolve incrementally as Airflow, dbt, and downstream analytics are introduced.
