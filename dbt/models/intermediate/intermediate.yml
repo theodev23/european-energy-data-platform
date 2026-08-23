@@ -1,0 +1,35 @@
+version: 2
+
+models:
+  - name: int_entsoe__day_ahead_prices_deduplicated
+    description: >
+      Day-ahead electricity prices with equivalent ENTSO-E TimeSeries
+      duplicates reduced deterministically to one row per business point.
+    columns:
+      - name: source_object_name
+        data_tests:
+          - not_null
+
+      - name: document_id
+        data_tests:
+          - not_null
+
+      - name: time_series_id
+        data_tests:
+          - not_null
+
+      - name: in_domain
+        data_tests:
+          - not_null
+
+      - name: out_domain
+        data_tests:
+          - not_null
+
+      - name: point_timestamp
+        data_tests:
+          - not_null
+
+      - name: price_amount
+        data_tests:
+          - not_null
