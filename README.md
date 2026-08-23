@@ -85,7 +85,8 @@ Optional technologies will only be introduced if they add clear architectural or
 
 ## Current status
 
-The project currently implements the source ingestion, immutable GCS RAW landing zone, and structured BigQuery RAW loading layers.
+The project currently implements the source ingestion, immutable GCS RAW landing
+zone, structured BigQuery RAW loading, and dbt transformation layers.
 
 Implemented so far:
 
@@ -111,46 +112,88 @@ Implemented so far:
   - seven-day soft delete;
 - real end-to-end smoke tests from ENTSO-E to GCS for all three MVP datasets;
 - source-aligned XML parsing into point-level RAW records for all three MVP datasets;
-- BigQuery RAW provisioning for the `entsoe_raw` dataset and three partitioned and clustered tables;
+- BigQuery RAW provisioning for the `entsoe_raw` dataset and three partitioned and
+  clustered tables;
 - deterministic BigQuery load jobs using `WRITE_APPEND` and `CREATE_NEVER`;
 - BigQuery rerun handling that recovers an existing deterministic load job on conflict;
-- real BigQuery data validation with:
+- real BigQuery RAW validation with:
   - 4 actual-load rows;
   - 57 actual-generation rows across 15 source TimeSeries;
   - 190 day-ahead-price rows across two source TimeSeries;
-- real BigQuery rerun validation confirming unchanged row counts for all three datasets;
+- real BigQuery rerun validation confirming unchanged RAW row counts;
+- an isolated dbt environment using dbt Core and the BigQuery adapter;
+- dbt source definitions for the three BigQuery RAW tables;
+- thin staging views for load, generation, and day-ahead prices;
+- intermediate models that:
+  - normalize ENTSO-E generation bidding-zone direction;
+  - deduplicate equivalent day-ahead price TimeSeries;
+- analytics-ready marts:
+  - `fct_actual_load`;
+  - `fct_generation_by_type`;
+  - `fct_day_ahead_prices`;
+- explicit mart grains validated against real ENTSO-E data;
+- dbt data-quality coverage with 70 tests across staging, intermediate, and marts;
+- real BigQuery mart validation with:
+  - 4 actual-load observations;
+  - 57 generation observations;
+  - 95 deduplicated day-ahead-price observations;
 - pytest and Ruff quality checks;
-- GitHub Actions CI on pull requests and pushes to `main`;
+- GitHub Actions CI for Python quality and cloud-free dbt project validation;
 - `.env.example` for local configuration without committing secrets.
 
 Not yet implemented:
 
 - Apache Airflow DAGs;
-- dbt staging, intermediate, and marts models;
 - analytical KPIs and downstream visualization.
 
 ## Local development
 
-Create and activate a virtual environment:
+Create and activate the application virtual environment:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-Install the project and development dependencies:
+Install the application and development dependencies:
 
 ```bash
 python -m pip install -e '.[dev]'
 ```
 
-Run the current quality checks:
+Create the isolated dbt virtual environment:
+
+```bash
+python3 -m venv .venv-dbt
+.venv-dbt/bin/python -m pip install -r requirements-dbt.txt
+```
+
+The dbt environment is intentionally isolated from the application environment
+to keep adapter-specific Google Cloud dependencies independent.
+
+Run the Python quality checks:
 
 ```bash
 python -m pytest
 ruff check .
 ruff format --check .
 git diff --check
+```
+
+Validate the dbt project locally without connecting to BigQuery:
+
+```bash
+GCP_PROJECT_ID=placeholder-project \
+DBT_DATASET=entsoe_dbt_dev \
+.venv-dbt/bin/dbt parse \
+  --project-dir dbt \
+  --profiles-dir dbt
+
+GCP_PROJECT_ID=placeholder-project \
+DBT_DATASET=entsoe_dbt_dev \
+.venv-dbt/bin/dbt ls \
+  --project-dir dbt \
+  --profiles-dir dbt
 ```
 
 ## Configuration and secrets
@@ -162,6 +205,9 @@ The repository contains `.env.example` only as a configuration template:
 ```text
 ENTSOE_API_TOKEN=
 GCS_RAW_BUCKET=
+GCP_PROJECT_ID=
+
+DBT_DATASET=
 ```
 
 A real local `.env` file is ignored by Git.
@@ -194,6 +240,35 @@ The project follows several core engineering principles:
 ├── .github/
 │   └── workflows/
 │       └── ci.yml
+├── dbt/
+│   ├── models/
+│   │   ├── staging/
+│   │   │   ├── sources.yml
+│   │   │   ├── staging.yml
+│   │   │   ├── stg_entsoe__actual_generation.sql
+│   │   │   ├── stg_entsoe__actual_load.sql
+│   │   │   └── stg_entsoe__day_ahead_prices.sql
+│   │   ├── intermediate/
+│   │   │   ├── intermediate.yml
+│   │   │   ├── int_entsoe__actual_generation_normalized.sql
+│   │   │   └── int_entsoe__day_ahead_prices_deduplicated.sql
+│   │   └── marts/
+│   │       ├── marts.yml
+│   │       ├── fct_actual_load.sql
+│   │       ├── fct_day_ahead_prices.sql
+│   │       └── fct_generation_by_type.sql
+│   ├── tests/
+│   │   ├── intermediate/
+│   │   │   ├── assert_actual_generation_has_single_bidding_zone.sql
+│   │   │   ├── assert_day_ahead_domains_match.sql
+│   │   │   ├── assert_day_ahead_price_duplicates_are_equivalent.sql
+│   │   │   └── assert_day_ahead_prices_are_unique.sql
+│   │   └── marts/
+│   │       ├── assert_actual_load_is_unique.sql
+│   │       ├── assert_day_ahead_price_mart_is_unique.sql
+│   │       └── assert_generation_by_type_is_unique.sql
+│   ├── dbt_project.yml
+│   └── profiles.yml
 ├── docs/
 │   └── architecture.md
 ├── src/
@@ -219,7 +294,9 @@ The project follows several core engineering principles:
 ├── .env.example
 ├── .gitignore
 ├── pyproject.toml
+├── requirements-dbt.txt
 └── README.md
 ```
 
-The repository structure will continue to evolve incrementally as Airflow, dbt, and downstream analytics are introduced.
+The repository structure will continue to evolve incrementally as Airflow and
+downstream analytics are introduced.

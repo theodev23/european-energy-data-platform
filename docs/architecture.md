@@ -187,32 +187,143 @@ confirmed that the missing source position 25 remains absent rather than being s
 
 ### dbt STAGING
 
-The staging layer:
+The staging layer provides a thin interface over the three BigQuery RAW tables.
 
-- renames and standardizes source fields;
-- applies basic type conversions;
-- normalizes timestamps;
-- exposes clean source-aligned models.
+The current models are:
+
+- `stg_entsoe__actual_load`;
+
+- `stg_entsoe__actual_generation`;
+
+- `stg_entsoe__day_ahead_prices`.
+
+They:
+
+- reference the versioned `entsoe_raw` dbt sources;
+
+- rename source fields into consistent analytical names;
+
+- preserve the source row grain and UTC point timestamps;
+
+- keep source lineage fields such as object name, document ID, and TimeSeries ID;
+
+- avoid business-level deduplication or aggregation;
+
+- apply `not_null` data-quality tests to required fields.
+
+Business rules and semantic normalization are intentionally deferred to the
+intermediate layer.
 
 ### dbt INTERMEDIATE
 
-The intermediate layer contains reusable transformations such as:
+The intermediate layer contains reusable business transformations built on top
+of staging.
 
-- generation normalization;
-- temporal alignment;
-- country and bidding-zone mappings;
-- renewable generation calculations.
+The current models are:
+
+- `int_entsoe__actual_generation_normalized`;
+
+- `int_entsoe__day_ahead_prices_deduplicated`.
+
+Generation normalization:
+
+- derives a single analytical `bidding_zone` from the ENTSO-E input and output
+  bidding-zone fields;
+
+- derives `domain_direction` as `in`, `out`, `both`, or `none`;
+
+- preserves the original input and output bidding-zone fields for lineage;
+
+- validates that current source rows contain exactly one populated bidding-zone
+  direction.
+
+Day-ahead price deduplication:
+
+- keeps RAW and staging source TimeSeries unchanged;
+
+- identifies equivalent duplicate day-ahead observations within the same source
+  object and document;
+
+- keeps one row deterministically using the lowest `time_series_id`;
+
+- validates that duplicated source rows are otherwise equivalent before
+  deduplication;
+
+- validates that the deduplicated business key is unique;
+
+- validates that `in_domain` and `out_domain` are equivalent for the current
+  day-ahead price source data.
+
+The intermediate layer therefore centralizes semantic normalization and
+source-specific data-quality rules without hiding inconsistencies in RAW data.
 
 ### dbt MARTS
 
-The marts layer exposes business-facing datasets such as:
+The marts layer exposes analytics-ready fact tables at explicit business grains.
 
-- hourly country energy metrics;
-- daily country energy metrics;
-- monthly country energy metrics;
-- electricity generation mix;
-- renewable share;
-- day-ahead price analysis.
+The current marts are:
+
+- `fct_actual_load`;
+
+- `fct_generation_by_type`;
+
+- `fct_day_ahead_prices`.
+
+`fct_actual_load` is built from `stg_entsoe__actual_load`.
+
+Its analytical grain is one actual-load observation per:
+
+- `bidding_zone`;
+
+- `point_timestamp`.
+
+`fct_generation_by_type` is built from
+`int_entsoe__actual_generation_normalized`.
+
+Its analytical grain is one generation observation per:
+
+- `bidding_zone`;
+
+- `psr_type`;
+
+- `domain_direction`;
+
+- `point_timestamp`.
+
+`domain_direction` is part of the grain because current ENTSO-E data can contain
+distinct `in` and `out` observations for the same bidding zone, production type,
+and timestamp with different generation quantities.
+
+`fct_day_ahead_prices` is built from
+`int_entsoe__day_ahead_prices_deduplicated`.
+
+Its analytical grain is one day-ahead price observation per:
+
+- `bidding_zone`;
+
+- `point_timestamp`.
+
+The marts preserve selected lineage and source-unit fields while exposing a
+smaller analytical interface than the upstream models.
+
+Data-quality controls include:
+
+- `not_null` tests for required analytical and lineage fields;
+
+- singular uniqueness tests matching each mart grain.
+
+Real BigQuery validation produced:
+
+- 4 rows in `fct_actual_load`;
+
+- 57 rows in `fct_generation_by_type`;
+
+- 95 rows in `fct_day_ahead_prices`.
+
+All 32 mart-level data tests pass against the current BigQuery data.
+
+Higher-level KPIs and downstream visualizations are intentionally deferred to a
+later project stage.
 
 ## Orchestration
 
@@ -252,10 +363,22 @@ Real BigQuery rerun tests confirmed unchanged row counts for all three MVP datas
 - day-ahead prices: 190 rows.
 
 The BigQuery job-ID mechanism provides retry and rerun idempotence while the deterministic job
+
 metadata remains available in BigQuery. It does not provide permanent row-level uniqueness.
 
-Later dbt layers will extend the strategy with stable business keys and incremental or merge-based
-models where appropriate.
+The dbt layers complement this mechanism with explicit business grains and data-quality controls.
+
+The day-ahead intermediate model deduplicates equivalent source TimeSeries within the same source
+
+object and document only after validating that the duplicated payloads are equivalent.
+
+The marts then enforce their analytical grains through singular uniqueness tests. These tests do
+
+not silently remove unexpected duplicates: they fail when the current business-grain assumptions
+
+are violated, making source revisions or overlapping observations visible for investigation.
+
+The current dbt marts are full table models rather than incremental or merge-based models.
 
 ## Time handling
 
