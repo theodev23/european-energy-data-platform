@@ -221,9 +221,15 @@ of staging.
 
 The current models are:
 
+- `int_entsoe__actual_load_canonical`;
+
 - `int_entsoe__actual_generation_normalized`;
 
-- `int_entsoe__day_ahead_prices_deduplicated`.
+- `int_entsoe__actual_generation_canonical`;
+
+- `int_entsoe__day_ahead_prices_deduplicated`;
+
+- `int_entsoe__day_ahead_prices_canonical`.
 
 Generation normalization:
 
@@ -249,13 +255,31 @@ Day-ahead price deduplication:
 - validates that duplicated source rows are otherwise equivalent before
   deduplication;
 
-- validates that the deduplicated business key is unique;
-
 - validates that `in_domain` and `out_domain` are equivalent for the current
   day-ahead price source data.
 
-The intermediate layer therefore centralizes semantic normalization and
-source-specific data-quality rules without hiding inconsistencies in RAW data.
+Cross-source canonicalization is applied after source-specific normalization or
+deduplication. It resolves overlapping immutable extracts to one analytical row
+per declared business grain.
+
+For all three datasets, canonical rows are selected deterministically by:
+
+1. highest ENTSO-E `revision_number`;
+2. most recent `document_created_at`;
+3. deterministic source object, document, and TimeSeries tie-breakers.
+
+The canonical business grains are:
+
+- actual load: `bidding_zone` and `point_timestamp`;
+- actual generation: `bidding_zone`, `psr_type`, `domain_direction`, and
+  `point_timestamp`;
+- day-ahead prices: `in_domain` and `point_timestamp`.
+
+Singular tests verify that each canonical intermediate model is unique at its
+declared grain.
+
+This design keeps the immutable RAW history intact while ensuring downstream
+analytics consume one deterministic version of overlapping observations.
 
 ### dbt MARTS
 
@@ -269,7 +293,7 @@ The current marts are:
 
 - `fct_day_ahead_prices`.
 
-`fct_actual_load` is built from `stg_entsoe__actual_load`.
+`fct_actual_load` is built from `int_entsoe__actual_load_canonical`.
 
 Its analytical grain is one actual-load observation per:
 
@@ -278,7 +302,7 @@ Its analytical grain is one actual-load observation per:
 - `point_timestamp`.
 
 `fct_generation_by_type` is built from
-`int_entsoe__actual_generation_normalized`.
+`int_entsoe__actual_generation_canonical`.
 
 Its analytical grain is one generation observation per:
 
@@ -295,7 +319,7 @@ distinct `in` and `out` observations for the same bidding zone, production type,
 and timestamp with different generation quantities.
 
 `fct_day_ahead_prices` is built from
-`int_entsoe__day_ahead_prices_deduplicated`.
+`int_entsoe__day_ahead_prices_canonical`.
 
 Its analytical grain is one day-ahead price observation per:
 
@@ -312,15 +336,17 @@ Data-quality controls include:
 
 - singular uniqueness tests matching each mart grain.
 
-Real BigQuery validation produced:
+Runtime BigQuery validation of overlapping hourly and daily source extracts
+produced:
 
-- 4 rows in `fct_actual_load`;
+- 96 canonical rows in `fct_actual_load`;
 
-- 57 rows in `fct_generation_by_type`;
+- a generation mart unique at its declared business grain;
 
-- 95 rows in `fct_day_ahead_prices`.
+- 191 canonical rows in `fct_day_ahead_prices`.
 
-All 32 mart-level data tests pass against the current BigQuery data.
+The complete dbt project currently contains 94 data tests. A real full
+`dbt build` completed with all 105 models and tests passing.
 
 The three marts are physically optimized for BigQuery analytics:
 
@@ -344,7 +370,10 @@ later project stage.
 Apache Airflow 3.3.1 orchestrates the end-to-end workflow through the
 `entsoe_daily_pipeline` DAG.
 
-The DAG is scheduled daily in UTC and uses Airflow logical data intervals.
+The DAG uses an explicit `CronDataIntervalTimetable` with a daily UTC
+schedule. This guarantees a 24-hour logical data interval independently of the
+global Airflow `scheduler.create_cron_data_intervals` configuration.
+
 `data_interval_start` and `data_interval_end` are passed to the application
 ingestion layer instead of deriving source periods from the current wall-clock
 time. This preserves deterministic reruns and supports explicit backfills.
@@ -402,45 +431,61 @@ ENTSO-E API requests.
 The dbt task invokes the isolated `.venv-dbt` environment and runs `dbt build`
 only after the RAW ingestion branches have completed successfully.
 
+Runtime validation has exercised each of the three ingestion task families for
+France and the downstream `run_dbt_build` task. This validates the task-level
+Airflow integration without claiming that a complete 30-task mapped DAG run has
+been executed.
+
 ## Idempotence strategy
 
-Pipeline runs must be safe to execute more than once for the same logical interval.
+Pipeline runs must be safe to execute more than once for the same logical
+interval while preserving source history.
 
 The RAW path currently supports safe reruns through:
 
 - explicit logical dates;
 - deterministic GCS object paths;
 - create-only GCS uploads using `if_generation_match=0`;
-- treating an existing deterministic GCS object as a successful no-op instead of overwriting it;
-- deterministic BigQuery load job IDs derived from the immutable source object name;
-- recovering an existing BigQuery job after a `409 Conflict` and waiting for its result.
+- treating an existing deterministic GCS object as a successful no-op instead
+  of overwriting it;
+- deterministic BigQuery load job IDs derived from the immutable source object
+  name;
+- recovering an existing BigQuery job after a `409 Conflict` and waiting for
+  its result.
 
-A real GCS rerun test confirmed that the object generation and size remain unchanged when the same
-interval is processed again.
+A real GCS rerun test confirmed that the object generation and size remain
+unchanged when the same interval is processed again.
 
-Real BigQuery rerun tests confirmed unchanged row counts for all three MVP datasets:
+The BigQuery job-ID mechanism protects normal retries while deterministic job
+metadata remains available. It is not a permanent row-level uniqueness
+constraint, and distinct immutable source objects may legitimately cover
+overlapping business intervals.
 
-- actual load: 4 rows;
-- actual generation: 57 rows;
-- day-ahead prices: 190 rows.
+The dbt layers therefore resolve business-level overlap explicitly rather than
+deleting or mutating RAW history.
 
-The BigQuery job-ID mechanism provides retry and rerun idempotence while the deterministic job
+Day-ahead prices first remove equivalent duplicate TimeSeries within the same
+source object and document after validating that those values are equivalent.
 
-metadata remains available in BigQuery. It does not provide permanent row-level uniqueness.
+All three datasets then apply cross-source canonicalization at their declared
+business grain. The preferred row is selected by highest `revision_number`,
+then most recent `document_created_at`, followed by deterministic technical
+tie-breakers.
 
-The dbt layers complement this mechanism with explicit business grains and data-quality controls.
+Real validation with overlapping one-hour and full-day source objects confirmed
+that the overlapping observations contained no conflicting values. The
+canonicalization reduced:
 
-The day-ahead intermediate model deduplicates equivalent source TimeSeries within the same source
+- actual load from 100 staged rows to 96 canonical rows;
+- actual generation from 1,446 normalized rows to 1,389 canonical rows;
+- day-ahead prices from 286 deduplicated rows to 191 canonical rows.
 
-object and document only after validating that the duplicated payloads are equivalent.
+Canonical intermediate models and marts both have singular uniqueness tests.
+Unexpected duplicates therefore remain visible as data-quality failures if the
+canonical business assumptions stop holding.
 
-The marts then enforce their analytical grains through singular uniqueness tests. These tests do
-
-not silently remove unexpected duplicates: they fail when the current business-grain assumptions
-
-are violated, making source revisions or overlapping observations visible for investigation.
-
-The current dbt marts are full table models rather than incremental or merge-based models.
+The current dbt marts are full table models rather than incremental or
+merge-based models.
 
 ## Time handling
 
