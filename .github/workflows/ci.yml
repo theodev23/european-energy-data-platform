@@ -63,3 +63,80 @@ jobs:
 
       - name: List dbt resources
         run: dbt ls --project-dir dbt --profiles-dir dbt
+
+  airflow-quality:
+    name: Airflow quality
+    runs-on: ubuntu-latest
+    env:
+      AIRFLOW_VERSION: "3.3.1"
+      PYTHON_VERSION: "3.12"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install Airflow
+        run: |
+          CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-no-providers-${PYTHON_VERSION}.txt"
+          python -m pip install -r requirements-airflow.txt --constraint "$CONSTRAINT_URL"
+
+      - name: Install project
+        run: |
+          CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-no-providers-${PYTHON_VERSION}.txt"
+          python -m pip install -e . --constraint "$CONSTRAINT_URL"
+
+      - name: Check Airflow dependencies
+        run: python -m pip check
+
+      - name: Validate Airflow DAG
+        run: |
+          env \
+            -u ENTSOE_API_TOKEN \
+            -u GCS_RAW_BUCKET \
+            -u GCP_PROJECT_ID \
+            -u DBT_DATASET \
+            python - <<'PY'
+          import importlib.util
+          from pathlib import Path
+
+          dag_path = Path("airflow/dags/entsoe_daily_pipeline.py").resolve()
+
+          spec = importlib.util.spec_from_file_location(
+              "entsoe_daily_pipeline",
+              dag_path,
+          )
+
+          if spec is None or spec.loader is None:
+              raise RuntimeError("Unable to create DAG module spec")
+
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+
+          dag = module.dag
+          dag.validate()
+
+          assert dag.dag_id == "entsoe_daily_pipeline"
+          assert len(dag.tasks) == 4
+          assert len(module.BIDDING_ZONE_CODES) == 10
+          assert len(set(module.BIDDING_ZONE_CODES)) == 10
+          assert dag.max_active_runs == 1
+          assert dag.max_active_tasks == 3
+
+          for task_id in (
+              "ingest_actual_load",
+              "ingest_actual_generation",
+              "ingest_day_ahead_prices",
+          ):
+              task = dag.get_task(task_id)
+              assert task.max_active_tis_per_dag == 1
+              assert task.retries == 2
+
+          dbt_task = dag.get_task("run_dbt_build")
+          assert dbt_task.retries == 1
+
+          print("Airflow DAG validation passed.")
+          PY
