@@ -86,7 +86,8 @@ Optional technologies will only be introduced if they add clear architectural or
 ## Current status
 
 The project currently implements the source ingestion, immutable GCS RAW landing
-zone, structured BigQuery RAW loading, and dbt transformation layers.
+zone, structured BigQuery RAW loading, dbt transformation layers, and Apache
+Airflow orchestration.
 
 Implemented so far:
 
@@ -138,12 +139,14 @@ Implemented so far:
   - 57 generation observations;
   - 95 deduplicated day-ahead-price observations;
 - pytest and Ruff quality checks;
-- GitHub Actions CI for Python quality and cloud-free dbt project validation;
+- Apache Airflow 3.3.1 daily orchestration with dynamic task mapping across the
+  10 target bidding zones and explicit concurrency limits;
+- GitHub Actions CI for Python quality, cloud-free dbt project validation, and
+  cloud-free Airflow DAG validation;
 - `.env.example` for local configuration without committing secrets.
 
 Not yet implemented:
 
-- Apache Airflow DAGs;
 - analytical KPIs and downstream visualization.
 
 ## Local development
@@ -168,8 +171,29 @@ python3 -m venv .venv-dbt
 .venv-dbt/bin/python -m pip install -r requirements-dbt.txt
 ```
 
-The dbt environment is intentionally isolated from the application environment
-to keep adapter-specific Google Cloud dependencies independent.
+Create the isolated Airflow virtual environment:
+
+```bash
+python3 -m venv .venv-airflow
+
+AIRFLOW_VERSION="3.3.1"
+PYTHON_VERSION="3.12"
+CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-no-providers-${PYTHON_VERSION}.txt"
+
+.venv-airflow/bin/python -m pip install \
+  -r requirements-airflow.txt \
+  --constraint "$CONSTRAINT_URL"
+
+.venv-airflow/bin/python -m pip install \
+  -e . \
+  --constraint "$CONSTRAINT_URL"
+
+.venv-airflow/bin/python -m pip check
+```
+
+The dbt and Airflow environments are intentionally isolated from the application
+environment. This keeps adapter-specific and orchestration-specific dependencies
+independent while allowing Airflow tasks to import the application package.
 
 Run the Python quality checks:
 
@@ -194,6 +218,38 @@ DBT_DATASET=entsoe_dbt_dev \
 .venv-dbt/bin/dbt ls \
   --project-dir dbt \
   --profiles-dir dbt
+```
+
+Validate the Airflow DAG locally without runtime secrets or cloud access:
+
+```bash
+env \
+  -u ENTSOE_API_TOKEN \
+  -u GCS_RAW_BUCKET \
+  -u GCP_PROJECT_ID \
+  -u DBT_DATASET \
+  .venv-airflow/bin/python - <<'PY'
+import importlib.util
+from pathlib import Path
+
+dag_path = Path("airflow/dags/entsoe_daily_pipeline.py").resolve()
+
+spec = importlib.util.spec_from_file_location(
+    "entsoe_daily_pipeline",
+    dag_path,
+)
+
+if spec is None or spec.loader is None:
+    raise RuntimeError("Unable to create DAG module spec")
+
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+
+dag = module.dag
+dag.validate()
+
+print("Airflow DAG validation passed.")
+PY
 ```
 
 ## Configuration and secrets
@@ -240,6 +296,9 @@ The project follows several core engineering principles:
 ├── .github/
 │   └── workflows/
 │       └── ci.yml
+├── airflow/
+│   └── dags/
+│       └── entsoe_daily_pipeline.py
 ├── dbt/
 │   ├── models/
 │   │   ├── staging/
@@ -274,29 +333,34 @@ The project follows several core engineering principles:
 ├── src/
 │   └── european_energy_data_platform/
 │       ├── __init__.py
+│       ├── areas.py
 │       ├── bigquery_raw.py
 │       ├── entsoe.py
 │       ├── gcs.py
 │       ├── ingestion.py
-│       └── parsing.py
+│       ├── parsing.py
+│       └── pipeline.py
 ├── tests/
 │   ├── fixtures/
 │   │   ├── actual_generation.xml
 │   │   ├── actual_load.xml
 │   │   └── day_ahead_prices.xml
+│   ├── test_areas.py
 │   ├── test_bigquery_loader.py
 │   ├── test_bigquery_raw.py
 │   ├── test_entsoe.py
 │   ├── test_gcs.py
 │   ├── test_ingestion.py
 │   ├── test_package.py
-│   └── test_parsing.py
+│   ├── test_parsing.py
+│   └── test_pipeline.py
 ├── .env.example
 ├── .gitignore
 ├── pyproject.toml
+├── requirements-airflow.txt
 ├── requirements-dbt.txt
 └── README.md
 ```
 
-The repository structure will continue to evolve incrementally as Airflow and
-downstream analytics are introduced.
+The repository structure will continue to evolve incrementally as downstream
+analytics are introduced.
