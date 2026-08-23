@@ -322,6 +322,20 @@ Real BigQuery validation produced:
 
 All 32 mart-level data tests pass against the current BigQuery data.
 
+The three marts are physically optimized for BigQuery analytics:
+
+- all marts use daily time partitioning on `point_timestamp`;
+
+- `fct_actual_load` clusters by `bidding_zone`;
+
+- `fct_generation_by_type` clusters by `bidding_zone`, `psr_type`, and
+  `domain_direction`;
+
+- `fct_day_ahead_prices` clusters by `bidding_zone`.
+
+These settings were validated directly against the resulting BigQuery table
+metadata after rebuilding the marts.
+
 Higher-level KPIs and downstream visualizations are intentionally deferred to a
 later project stage.
 
