@@ -1,0 +1,87 @@
+version: 2
+
+models:
+  - name: stg_entsoe__actual_load
+    description: Clean staging view of ENTSO-E actual total load RAW records.
+    columns:
+      - name: source_object_name
+        data_tests:
+          - not_null
+
+      - name: document_id
+        data_tests:
+          - not_null
+
+      - name: time_series_id
+        data_tests:
+          - not_null
+
+      - name: bidding_zone
+        data_tests:
+          - not_null
+
+      - name: point_timestamp
+        data_tests:
+          - not_null
+
+      - name: load_quantity
+        data_tests:
+          - not_null
+
+  - name: stg_entsoe__actual_generation
+    description: Clean staging view of ENTSO-E actual generation RAW records.
+    columns:
+      - name: source_object_name
+        data_tests:
+          - not_null
+
+      - name: document_id
+        data_tests:
+          - not_null
+
+      - name: time_series_id
+        data_tests:
+          - not_null
+
+      - name: psr_type
+        data_tests:
+          - not_null
+
+      - name: point_timestamp
+        data_tests:
+          - not_null
+
+      - name: generation_quantity
+        data_tests:
+          - not_null
+
+  - name: stg_entsoe__day_ahead_prices
+    description: Clean staging view of ENTSO-E day-ahead price RAW records.
+    columns:
+      - name: source_object_name
+        data_tests:
+          - not_null
+
+      - name: document_id
+        data_tests:
+          - not_null
+
+      - name: time_series_id
+        data_tests:
+          - not_null
+
+      - name: in_domain
+        data_tests:
+          - not_null
+
+      - name: out_domain
+        data_tests:
+          - not_null
+
+      - name: point_timestamp
+        data_tests:
+          - not_null
+
+      - name: price_amount
+        data_tests:
+          - not_null

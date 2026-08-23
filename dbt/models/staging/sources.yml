@@ -1,0 +1,17 @@
+version: 2
+
+sources:
+  - name: entsoe_raw
+    description: Structured ENTSO-E RAW records loaded by the Python ingestion layer.
+    database: "{{ env_var('GCP_PROJECT_ID') }}"
+    schema: entsoe_raw
+
+    tables:
+      - name: actual_load
+        description: Actual total load points preserved at ENTSO-E source grain.
+
+      - name: actual_generation
+        description: Actual generation points by production type preserved at ENTSO-E source grain.
+
+      - name: day_ahead_prices
+        description: Day-ahead electricity price points preserved at ENTSO-E source grain.
