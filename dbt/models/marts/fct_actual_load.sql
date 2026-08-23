@@ -1,3 +1,14 @@
+{{
+    config(
+        partition_by={
+            "field": "point_timestamp",
+            "data_type": "timestamp",
+            "granularity": "day",
+        },
+        cluster_by=["bidding_zone"],
+    )
+}}
+
 with load as (
     select *
     from {{ ref('stg_entsoe__actual_load') }}

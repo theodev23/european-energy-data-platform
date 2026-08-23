@@ -1,3 +1,14 @@
+{{
+    config(
+        partition_by={
+            "field": "point_timestamp",
+            "data_type": "timestamp",
+            "granularity": "day",
+        },
+        cluster_by=["bidding_zone", "psr_type", "domain_direction"],
+    )
+}}
+
 with generation as (
     select *
     from {{ ref('int_entsoe__actual_generation_normalized') }}

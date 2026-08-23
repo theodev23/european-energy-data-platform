@@ -1,3 +1,14 @@
+{{
+    config(
+        partition_by={
+            "field": "point_timestamp",
+            "data_type": "timestamp",
+            "granularity": "day",
+        },
+        cluster_by=["bidding_zone"],
+    )
+}}
+
 with prices as (
     select *
     from {{ ref('int_entsoe__day_ahead_prices_deduplicated') }}
