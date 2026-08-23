@@ -11,7 +11,7 @@
 
 with prices as (
     select *
-    from {{ ref('int_entsoe__day_ahead_prices_deduplicated') }}
+    from {{ ref('int_entsoe__day_ahead_prices_canonical') }}
 ),
 
 final as (

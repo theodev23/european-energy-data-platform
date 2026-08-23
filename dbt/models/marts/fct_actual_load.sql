@@ -11,7 +11,7 @@
 
 with load as (
     select *
-    from {{ ref('stg_entsoe__actual_load') }}
+    from {{ ref('int_entsoe__actual_load_canonical') }}
 ),
 
 final as (
