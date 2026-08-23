@@ -1,0 +1,133 @@
+version: 2
+
+models:
+  - name: fct_actual_load
+    description: >
+      Analytics-ready actual electricity load observations by bidding zone
+      and timestamp.
+    columns:
+      - name: source_object_name
+        data_tests:
+          - not_null
+
+      - name: document_id
+        data_tests:
+          - not_null
+
+      - name: time_series_id
+        data_tests:
+          - not_null
+
+      - name: bidding_zone
+        data_tests:
+          - not_null
+
+      - name: point_timestamp
+        data_tests:
+          - not_null
+
+      - name: load_quantity
+        data_tests:
+          - not_null
+
+      - name: quantity_unit
+        data_tests:
+          - not_null
+
+      - name: resolution
+        data_tests:
+          - not_null
+
+  - name: fct_generation_by_type
+    description: >
+      Analytics-ready actual electricity generation observations by bidding
+      zone, production type, and timestamp.
+    columns:
+      - name: source_object_name
+        data_tests:
+          - not_null
+
+      - name: document_id
+        data_tests:
+          - not_null
+
+      - name: time_series_id
+        data_tests:
+          - not_null
+
+      - name: bidding_zone
+        data_tests:
+          - not_null
+
+      - name: domain_direction
+        data_tests:
+          - not_null
+
+      - name: psr_type
+        data_tests:
+          - not_null
+
+      - name: point_timestamp
+        data_tests:
+          - not_null
+
+      - name: generation_quantity
+        data_tests:
+          - not_null
+
+      - name: quantity_unit
+        data_tests:
+          - not_null
+
+      - name: resolution
+        data_tests:
+          - not_null
+
+  - name: fct_day_ahead_prices
+    description: >
+      Analytics-ready deduplicated day-ahead electricity prices by bidding
+      zone and timestamp.
+    columns:
+      - name: source_object_name
+        data_tests:
+          - not_null
+
+      - name: document_id
+        data_tests:
+          - not_null
+
+      - name: time_series_id
+        data_tests:
+          - not_null
+
+      - name: bidding_zone
+        data_tests:
+          - not_null
+
+      - name: auction_type
+        data_tests:
+          - not_null
+
+      - name: contract_market_agreement_type
+        data_tests:
+          - not_null
+
+      - name: point_timestamp
+        data_tests:
+          - not_null
+
+      - name: price_amount
+        data_tests:
+          - not_null
+
+      - name: currency_unit
+        data_tests:
+          - not_null
+
+      - name: price_unit
+        data_tests:
+          - not_null
+
+      - name: resolution
+        data_tests:
+          - not_null
