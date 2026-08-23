@@ -1,0 +1,23 @@
+with prices as (
+    select *
+    from {{ ref('int_entsoe__day_ahead_prices_deduplicated') }}
+),
+
+final as (
+    select
+        source_object_name,
+        document_id,
+        time_series_id,
+        in_domain as bidding_zone,
+        auction_type,
+        contract_market_agreement_type,
+        point_timestamp,
+        price_amount,
+        currency_unit,
+        price_unit,
+        resolution
+    from prices
+)
+
+select *
+from final
