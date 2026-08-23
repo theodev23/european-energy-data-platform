@@ -341,18 +341,66 @@ later project stage.
 
 ## Orchestration
 
-Apache Airflow orchestrates the end-to-end workflow.
+Apache Airflow 3.3.1 orchestrates the end-to-end workflow through the
+`entsoe_daily_pipeline` DAG.
 
-DAGs will be designed around logical data intervals rather than the current wall-clock time.
+The DAG is scheduled daily in UTC and uses Airflow logical data intervals.
+`data_interval_start` and `data_interval_end` are passed to the application
+ingestion layer instead of deriving source periods from the current wall-clock
+time. This preserves deterministic reruns and supports explicit backfills.
 
-This enables:
+The orchestration graph contains three dynamically mapped ingestion tasks:
 
-- scheduled daily runs;
-- explicit date parameters;
-- retries;
-- dependency management;
-- backfills;
-- reproducible reruns.
+- `ingest_actual_load`;
+- `ingest_actual_generation`;
+- `ingest_day_ahead_prices`.
+
+Each task is mapped across the 10 configured ENTSO-E bidding zones. A single
+mapped task instance handles one dataset and one bidding zone by delegating to
+the application pipeline:
+
+```text
+ENTSO-E
+  -> immutable GCS RAW payload
+  -> XML parsing
+  -> BigQuery RAW
+```
+
+The DAG therefore creates 30 mapped ingestion task instances per logical run.
+The XML payload itself is not passed through Airflow XCom. Tasks return only
+lightweight ingestion metadata.
+
+After all mapped ingestion tasks succeed, `run_dbt_build` executes the dbt
+transformation project:
+
+```text
+actual load [10] -----------\
+actual generation [10] ------> dbt build
+day-ahead prices [10] -------/
+```
+
+Runtime configuration is read only when tasks execute. DAG parsing does not
+require the ENTSO-E token, GCS bucket, GCP project, or dbt dataset environment
+variables. This keeps scheduler parsing and CI validation independent of cloud
+credentials.
+
+The DAG applies explicit operational controls:
+
+- `catchup=False` to avoid automatically scheduling historical runs when the
+  DAG is enabled;
+- `max_active_runs=1` to prevent overlapping DAG runs;
+- `max_active_tasks=3` to bound total task concurrency;
+- `max_active_tis_per_dag=1` for each mapped ingestion family;
+- two Airflow retries for ingestion tasks;
+- one Airflow retry for the dbt task.
+
+The three ingestion families can therefore execute concurrently, while the
+bidding zones inside each family are processed one at a time. This keeps the
+dynamic mapping observability without creating an unnecessary burst of
+ENTSO-E API requests.
+
+The dbt task invokes the isolated `.venv-dbt` environment and runs `dbt build`
+only after the RAW ingestion branches have completed successfully.
 
 ## Idempotence strategy
 
