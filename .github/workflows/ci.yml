@@ -36,3 +36,30 @@ jobs:
 
       - name: Check Ruff formatting
         run: ruff format --check .
+
+  dbt-quality:
+    name: dbt quality
+
+    runs-on: ubuntu-latest
+
+    env:
+      GCP_PROJECT_ID: placeholder-project
+      DBT_DATASET: entsoe_dbt_dev
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install dbt
+        run: python -m pip install -r requirements-dbt.txt
+
+      - name: Parse dbt project
+        run: dbt parse --project-dir dbt --profiles-dir dbt
+
+      - name: List dbt resources
+        run: dbt ls --project-dir dbt --profiles-dir dbt
