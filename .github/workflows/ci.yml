@@ -101,7 +101,12 @@ jobs:
             -u DBT_DATASET \
             python - <<'PY'
           import importlib.util
+          from datetime import timedelta
           from pathlib import Path
+
+          import pendulum
+          from airflow.timetables.base import TimeRestriction
+          from airflow.timetables.interval import CronDataIntervalTimetable
 
           dag_path = Path("airflow/dags/entsoe_daily_pipeline.py").resolve()
 
@@ -125,6 +130,27 @@ jobs:
           assert len(set(module.BIDDING_ZONE_CODES)) == 10
           assert dag.max_active_runs == 1
           assert dag.max_active_tasks == 3
+          assert isinstance(dag.timetable, CronDataIntervalTimetable)
+
+          interval_info = dag.timetable.next_dagrun_info(
+              last_automated_data_interval=None,
+              restriction=TimeRestriction(
+                  earliest=pendulum.datetime(
+                      2026,
+                      8,
+                      20,
+                      tz="UTC",
+                  ),
+                  latest=None,
+                  catchup=True,
+              ),
+          )
+
+          assert interval_info is not None
+          assert (
+              interval_info.data_interval.end
+              - interval_info.data_interval.start
+          ) == timedelta(days=1)
 
           for task_id in (
               "ingest_actual_load",
