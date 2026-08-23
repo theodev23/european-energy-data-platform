@@ -41,7 +41,7 @@ models:
   - name: fct_generation_by_type
     description: >
       Analytics-ready actual electricity generation observations by bidding
-      zone, production type, and timestamp.
+      zone, production type, domain direction, and timestamp.
     columns:
       - name: source_object_name
         data_tests:
