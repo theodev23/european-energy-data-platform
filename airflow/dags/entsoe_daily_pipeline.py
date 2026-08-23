@@ -105,12 +105,14 @@ def _run_ingestion(
     start_date=datetime(2026, 8, 1, tzinfo=UTC),
     catchup=False,
     max_active_runs=1,
+    max_active_tasks=3,
     tags=["entsoe", "energy", "elt"],
 )
 def entsoe_daily_pipeline():
     @task(
         retries=2,
         retry_delay=timedelta(minutes=5),
+        max_active_tis_per_dag=1,
     )
     def ingest_actual_load(bidding_zone: str) -> dict:
         return _run_ingestion(
@@ -121,6 +123,7 @@ def entsoe_daily_pipeline():
     @task(
         retries=2,
         retry_delay=timedelta(minutes=5),
+        max_active_tis_per_dag=1,
     )
     def ingest_actual_generation(bidding_zone: str) -> dict:
         return _run_ingestion(
@@ -131,6 +134,7 @@ def entsoe_daily_pipeline():
     @task(
         retries=2,
         retry_delay=timedelta(minutes=5),
+        max_active_tis_per_dag=1,
     )
     def ingest_day_ahead_prices(bidding_zone: str) -> dict:
         return _run_ingestion(
