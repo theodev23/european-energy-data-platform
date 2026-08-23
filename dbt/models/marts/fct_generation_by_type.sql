@@ -11,7 +11,7 @@
 
 with generation as (
     select *
-    from {{ ref('int_entsoe__actual_generation_normalized') }}
+    from {{ ref('int_entsoe__actual_generation_canonical') }}
 ),
 
 final as (

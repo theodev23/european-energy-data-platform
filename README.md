@@ -127,20 +127,25 @@ Implemented so far:
 - thin staging views for load, generation, and day-ahead prices;
 - intermediate models that:
   - normalize ENTSO-E generation bidding-zone direction;
-  - deduplicate equivalent day-ahead price TimeSeries;
+  - deduplicate equivalent day-ahead price TimeSeries within a source object;
+  - canonicalize overlapping source extracts at each declared business grain
+    using ENTSO-E revision metadata and deterministic technical tie-breakers;
 - analytics-ready marts:
   - `fct_actual_load`;
   - `fct_generation_by_type`;
   - `fct_day_ahead_prices`;
 - explicit mart grains validated against real ENTSO-E data;
-- dbt data-quality coverage with 70 tests across staging, intermediate, and marts;
-- real BigQuery mart validation with:
-  - 4 actual-load observations;
-  - 57 generation observations;
-  - 95 deduplicated day-ahead-price observations;
+- dbt data-quality coverage with 94 tests across staging, intermediate, and marts;
+- real BigQuery canonicalization validation with:
+  - 100 staged actual-load rows reduced to 96 canonical observations;
+  - 1,446 normalized generation rows reduced to 1,389 canonical observations;
+  - 286 deduplicated day-ahead-price rows reduced to 191 canonical observations;
 - pytest and Ruff quality checks;
-- Apache Airflow 3.3.1 daily orchestration with dynamic task mapping across the
-  10 target bidding zones and explicit concurrency limits;
+- Apache Airflow 3.3.1 daily orchestration with explicit 24-hour UTC data
+  intervals, dynamic task mapping across the 10 target bidding zones, and
+  explicit concurrency limits;
+- runtime Airflow validation of all three ingestion task families for France
+  and of the downstream `run_dbt_build` task;
 - GitHub Actions CI for Python quality, cloud-free dbt project validation, and
   cloud-free Airflow DAG validation;
 - `.env.example` for local configuration without committing secrets.
@@ -309,7 +314,10 @@ The project follows several core engineering principles:
 │   │   │   └── stg_entsoe__day_ahead_prices.sql
 │   │   ├── intermediate/
 │   │   │   ├── intermediate.yml
+│   │   │   ├── int_entsoe__actual_generation_canonical.sql
 │   │   │   ├── int_entsoe__actual_generation_normalized.sql
+│   │   │   ├── int_entsoe__actual_load_canonical.sql
+│   │   │   ├── int_entsoe__day_ahead_prices_canonical.sql
 │   │   │   └── int_entsoe__day_ahead_prices_deduplicated.sql
 │   │   └── marts/
 │   │       ├── marts.yml
@@ -318,10 +326,13 @@ The project follows several core engineering principles:
 │   │       └── fct_generation_by_type.sql
 │   ├── tests/
 │   │   ├── intermediate/
+│   │   │   ├── assert_actual_generation_canonical_is_unique.sql
 │   │   │   ├── assert_actual_generation_has_single_bidding_zone.sql
+│   │   │   ├── assert_actual_load_canonical_is_unique.sql
 │   │   │   ├── assert_day_ahead_domains_match.sql
 │   │   │   ├── assert_day_ahead_price_duplicates_are_equivalent.sql
-│   │   │   └── assert_day_ahead_prices_are_unique.sql
+│   │   │   ├── assert_day_ahead_prices_are_unique.sql
+│   │   │   └── assert_day_ahead_prices_canonical_is_unique.sql
 │   │   └── marts/
 │   │       ├── assert_actual_load_is_unique.sql
 │   │       ├── assert_day_ahead_price_mart_is_unique.sql

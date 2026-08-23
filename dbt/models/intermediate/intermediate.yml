@@ -1,6 +1,72 @@
 version: 2
 
 models:
+  - name: int_entsoe__actual_load_canonical
+    description: >
+      Actual load observations canonicalized to one row per bidding zone and
+      timestamp. Overlapping source extracts prefer the highest ENTSO-E
+      revision number, then the most recent document creation timestamp, with
+      deterministic technical tie-breakers.
+    columns:
+      - name: source_object_name
+        data_tests:
+          - not_null
+
+      - name: document_id
+        data_tests:
+          - not_null
+
+      - name: time_series_id
+        data_tests:
+          - not_null
+
+      - name: bidding_zone
+        data_tests:
+          - not_null
+
+      - name: point_timestamp
+        data_tests:
+          - not_null
+
+      - name: load_quantity
+        data_tests:
+          - not_null
+
+  - name: int_entsoe__day_ahead_prices_canonical
+    description: >
+      Day-ahead electricity prices canonicalized to one row per bidding zone
+      and timestamp across overlapping source extracts. Canonical records
+      prefer the highest ENTSO-E revision number, then the most recent
+      document creation timestamp, with deterministic technical tie-breakers.
+    columns:
+      - name: source_object_name
+        data_tests:
+          - not_null
+
+      - name: document_id
+        data_tests:
+          - not_null
+
+      - name: time_series_id
+        data_tests:
+          - not_null
+
+      - name: in_domain
+        data_tests:
+          - not_null
+
+      - name: out_domain
+        data_tests:
+          - not_null
+
+      - name: point_timestamp
+        data_tests:
+          - not_null
+
+      - name: price_amount
+        data_tests:
+          - not_null
+
   - name: int_entsoe__day_ahead_prices_deduplicated
     description: >
       Day-ahead electricity prices with equivalent ENTSO-E TimeSeries
@@ -31,6 +97,46 @@ models:
           - not_null
 
       - name: price_amount
+        data_tests:
+          - not_null
+
+  - name: int_entsoe__actual_generation_canonical
+    description: >
+      Actual generation observations canonicalized to one row per bidding
+      zone, production type, domain direction, and timestamp. Overlapping
+      source extracts prefer the highest ENTSO-E revision number, then the
+      most recent document creation timestamp, with deterministic technical
+      tie-breakers.
+    columns:
+      - name: source_object_name
+        data_tests:
+          - not_null
+
+      - name: document_id
+        data_tests:
+          - not_null
+
+      - name: time_series_id
+        data_tests:
+          - not_null
+
+      - name: bidding_zone
+        data_tests:
+          - not_null
+
+      - name: domain_direction
+        data_tests:
+          - not_null
+
+      - name: psr_type
+        data_tests:
+          - not_null
+
+      - name: point_timestamp
+        data_tests:
+          - not_null
+
+      - name: generation_quantity
         data_tests:
           - not_null
 

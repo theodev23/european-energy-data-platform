@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from airflow.sdk import dag, get_current_context, task
+from airflow.timetables.interval import CronDataIntervalTimetable
 
 from european_energy_data_platform.areas import TARGET_BIDDING_ZONES
 from european_energy_data_platform.bigquery_raw import BigQueryRawLoader
@@ -101,7 +102,10 @@ def _run_ingestion(
 @dag(
     dag_id="entsoe_daily_pipeline",
     description="Daily ENTSO-E ingestion and dbt transformation pipeline.",
-    schedule="@daily",
+    schedule=CronDataIntervalTimetable(
+        "@daily",
+        timezone="UTC",
+    ),
     start_date=datetime(2026, 8, 1, tzinfo=UTC),
     catchup=False,
     max_active_runs=1,
