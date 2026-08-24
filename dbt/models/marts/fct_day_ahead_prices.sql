@@ -22,6 +22,8 @@ final as (
         in_domain as bidding_zone,
         auction_type,
         contract_market_agreement_type,
+        period_start,
+        period_end,
         point_timestamp,
         price_amount,
         currency_unit,
