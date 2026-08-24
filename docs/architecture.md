@@ -283,14 +283,13 @@ analytics consume one deterministic version of overlapping observations.
 
 ### dbt MARTS
 
-The marts layer exposes analytics-ready fact tables at explicit business grains.
+The marts layer exposes analytics-ready fact tables and daily KPI aggregates at
+explicit business grains.
 
-The current marts are:
+The fact marts are:
 
 - `fct_actual_load`;
-
 - `fct_generation_by_type`;
-
 - `fct_day_ahead_prices`.
 
 `fct_actual_load` is built from `int_entsoe__actual_load_canonical`.
@@ -298,7 +297,6 @@ The current marts are:
 Its analytical grain is one actual-load observation per:
 
 - `bidding_zone`;
-
 - `point_timestamp`.
 
 `fct_generation_by_type` is built from
@@ -307,16 +305,13 @@ Its analytical grain is one actual-load observation per:
 Its analytical grain is one generation observation per:
 
 - `bidding_zone`;
-
 - `psr_type`;
-
 - `domain_direction`;
-
 - `point_timestamp`.
 
-`domain_direction` is part of the grain because current ENTSO-E data can contain
-distinct `in` and `out` observations for the same bidding zone, production type,
-and timestamp with different generation quantities.
+`domain_direction` remains part of the grain because ENTSO-E data can contain
+distinct `in` and `out` observations for the same bidding zone, production
+type, and timestamp.
 
 `fct_day_ahead_prices` is built from
 `int_entsoe__day_ahead_prices_canonical`.
@@ -324,46 +319,102 @@ and timestamp with different generation quantities.
 Its analytical grain is one day-ahead price observation per:
 
 - `bidding_zone`;
-
 - `point_timestamp`.
 
-The marts preserve selected lineage and source-unit fields while exposing a
-smaller analytical interface than the upstream models.
+It also exposes `period_start` and `period_end` so downstream price aggregates
+can retain the ENTSO-E delivery-period semantics rather than grouping prices
+naively by UTC calendar date.
 
-Data-quality controls include:
+The daily KPI marts are:
+
+- `agg_daily_load`;
+- `agg_daily_generation_by_type`;
+- `agg_daily_day_ahead_prices`.
+
+`agg_daily_load` has one row per:
+
+- `bidding_zone`;
+- UTC `observation_date`.
+
+It exposes average, minimum, and maximum load, the timestamp of peak load,
+observed energy in MWh, observed and expected interval counts, a coverage
+ratio, and an explicit complete-day flag.
+
+`agg_daily_generation_by_type` has one row per:
+
+- `bidding_zone`;
+- UTC `observation_date`;
+- `psr_type`;
+- `domain_direction`.
+
+It exposes equivalent generation statistics and observed energy while keeping
+partial production series visible through the same coverage indicators.
+
+For load and generation, interval duration is derived from the ENTSO-E
+resolution. Observed energy is computed from the available power observations
+and their interval duration. Missing observations are not interpolated or
+silently treated as a complete day.
+
+`agg_daily_day_ahead_prices` has one row per:
+
+- `bidding_zone`;
+- ENTSO-E `delivery_date`.
+
+The delivery date is derived from the source delivery period rather than
+`date(point_timestamp)`. This is required because a European day-ahead
+delivery period can cross UTC date boundaries.
+
+The price aggregate exposes:
+
+- average, minimum, and maximum EUR/MWh price;
+- count and duration of negative-price intervals;
+- observed and expected interval counts;
+- coverage ratio;
+- an explicit complete-delivery-day flag.
+
+The expected price interval count is derived from `period_start`, `period_end`,
+and the source resolution rather than being hard-coded to 96 intervals. This
+keeps the model compatible with delivery periods whose duration changes around
+daylight-saving-time transitions.
+
+Data-quality controls across marts include:
 
 - `not_null` tests for required analytical and lineage fields;
+- singular uniqueness tests matching every declared fact and aggregate grain;
+- metric-validity tests for coverage bounds, interval counts, min/average/max
+  ordering, completeness flags, energy values, peak timestamps, and
+  negative-price metrics.
 
-- singular uniqueness tests matching each mart grain.
+The complete dbt project currently defines 14 models, 149 data tests, and
+3 sources.
 
-Runtime BigQuery validation of overlapping hourly and daily source extracts
-produced:
+Real BigQuery validation produced:
 
-- 96 canonical rows in `fct_actual_load`;
+- 96 canonical load observations in `fct_actual_load`;
+- 1,389 canonical generation observations in `fct_generation_by_type`;
+- 191 canonical price observations in `fct_day_ahead_prices`;
+- one France row in `agg_daily_load` for 2026-08-20 with 96/96 intervals,
+  coverage 1.0, and 1,032,628.53 MWh of observed energy;
+- 15 France rows in `agg_daily_generation_by_type` for 2026-08-20, including
+  partial groups at 75/96, 92/96, and 70/96 intervals;
+- two France rows in `agg_daily_day_ahead_prices`, with delivery-period
+  coverage of 95/96 and 96/96 intervals.
 
-- a generation mart unique at its declared business grain;
+Targeted real dbt builds of all three daily KPI marts and their associated tests
+completed successfully.
 
-- 191 canonical rows in `fct_day_ahead_prices`.
+A subsequent full real `dbt build` also completed successfully with 6 table
+models, 8 view models, and 149 data tests. The final result was `PASS=163`,
+`WARN=0`, `ERROR=0`, and `SKIP=0`.
 
-The complete dbt project currently contains 94 data tests. A real full
-`dbt build` completed with all 105 models and tests passing.
+The fact marts are physically optimized with daily partitioning on
+`point_timestamp` and source-appropriate clustering.
 
-The three marts are physically optimized for BigQuery analytics:
+The daily KPI marts are physically optimized with daily partitioning on
+`observation_date` or `delivery_date` and clustering by their leading business
+dimensions.
 
-- all marts use daily time partitioning on `point_timestamp`;
-
-- `fct_actual_load` clusters by `bidding_zone`;
-
-- `fct_generation_by_type` clusters by `bidding_zone`, `psr_type`, and
-  `domain_direction`;
-
-- `fct_day_ahead_prices` clusters by `bidding_zone`.
-
-These settings were validated directly against the resulting BigQuery table
-metadata after rebuilding the marts.
-
-Higher-level KPIs and downstream visualizations are intentionally deferred to a
-later project stage.
+Downstream visualization remains an optional later project stage.
 
 ## Orchestration
 
