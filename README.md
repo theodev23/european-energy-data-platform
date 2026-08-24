@@ -130,16 +130,31 @@ Implemented so far:
   - deduplicate equivalent day-ahead price TimeSeries within a source object;
   - canonicalize overlapping source extracts at each declared business grain
     using ENTSO-E revision metadata and deterministic technical tie-breakers;
-- analytics-ready marts:
+- analytics-ready fact marts:
   - `fct_actual_load`;
   - `fct_generation_by_type`;
   - `fct_day_ahead_prices`;
-- explicit mart grains validated against real ENTSO-E data;
-- dbt data-quality coverage with 94 tests across staging, intermediate, and marts;
+- daily analytical KPI marts:
+  - `agg_daily_load`;
+  - `agg_daily_generation_by_type`;
+  - `agg_daily_day_ahead_prices`;
+- explicit fact and aggregate grains validated against real ENTSO-E data;
+- coverage-aware daily KPIs that preserve incomplete observation periods instead
+  of silently treating partial data as complete;
+- dbt data-quality coverage with 149 tests across staging, intermediate, and marts;
+- real full dbt build validation with 6 table models, 8 view models, and
+  149 tests passing (`PASS=163`, `WARN=0`, `ERROR=0`, `SKIP=0`);
 - real BigQuery canonicalization validation with:
   - 100 staged actual-load rows reduced to 96 canonical observations;
   - 1,446 normalized generation rows reduced to 1,389 canonical observations;
   - 286 deduplicated day-ahead-price rows reduced to 191 canonical observations;
+- real BigQuery validation of daily KPI marts with:
+  - one complete France load day at 96/96 PT15M intervals, including
+    1,032,628.53 MWh of observed energy;
+  - 15 France generation groups with explicit coverage, including partial
+    series at 75/96, 92/96, and 70/96 intervals;
+  - two France day-ahead delivery days with 95/96 and 96/96 intervals,
+    preserving the incomplete first delivery period;
 - pytest and Ruff quality checks;
 - Apache Airflow 3.3.1 daily orchestration with explicit 24-hour UTC data
   intervals, dynamic task mapping across the 10 target bidding zones, and
@@ -152,7 +167,7 @@ Implemented so far:
 
 Not yet implemented:
 
-- analytical KPIs and downstream visualization.
+- downstream visualization.
 
 ## Local development
 
@@ -321,6 +336,9 @@ The project follows several core engineering principles:
 │   │   │   └── int_entsoe__day_ahead_prices_deduplicated.sql
 │   │   └── marts/
 │   │       ├── marts.yml
+│   │       ├── agg_daily_day_ahead_prices.sql
+│   │       ├── agg_daily_generation_by_type.sql
+│   │       ├── agg_daily_load.sql
 │   │       ├── fct_actual_load.sql
 │   │       ├── fct_day_ahead_prices.sql
 │   │       └── fct_generation_by_type.sql
@@ -335,6 +353,12 @@ The project follows several core engineering principles:
 │   │   │   └── assert_day_ahead_prices_canonical_is_unique.sql
 │   │   └── marts/
 │   │       ├── assert_actual_load_is_unique.sql
+│   │       ├── assert_daily_day_ahead_price_metrics_are_valid.sql
+│   │       ├── assert_daily_day_ahead_prices_is_unique.sql
+│   │       ├── assert_daily_generation_by_type_is_unique.sql
+│   │       ├── assert_daily_generation_by_type_metrics_are_valid.sql
+│   │       ├── assert_daily_load_is_unique.sql
+│   │       ├── assert_daily_load_metrics_are_valid.sql
 │   │       ├── assert_day_ahead_price_mart_is_unique.sql
 │   │       └── assert_generation_by_type_is_unique.sql
 │   ├── dbt_project.yml
@@ -373,5 +397,5 @@ The project follows several core engineering principles:
 └── README.md
 ```
 
-The repository structure will continue to evolve incrementally as downstream
-analytics are introduced.
+The repository structure may continue to evolve incrementally as downstream
+visualization or optional infrastructure is introduced.

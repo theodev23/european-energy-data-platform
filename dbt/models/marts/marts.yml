@@ -112,6 +112,14 @@ models:
         data_tests:
           - not_null
 
+      - name: period_start
+        data_tests:
+          - not_null
+
+      - name: period_end
+        data_tests:
+          - not_null
+
       - name: point_timestamp
         data_tests:
           - not_null
@@ -129,5 +137,209 @@ models:
           - not_null
 
       - name: resolution
+        data_tests:
+          - not_null
+
+  - name: agg_daily_day_ahead_prices
+    description: >
+      Daily day-ahead electricity price KPIs by bidding zone and ENTSO-E
+      delivery date, including explicit temporal coverage indicators.
+    columns:
+      - name: bidding_zone
+        data_tests:
+          - not_null
+
+      - name: delivery_date
+        data_tests:
+          - not_null
+
+      - name: period_start
+        data_tests:
+          - not_null
+
+      - name: period_end
+        data_tests:
+          - not_null
+
+      - name: currency_unit
+        data_tests:
+          - not_null
+
+      - name: price_unit
+        data_tests:
+          - not_null
+
+      - name: resolution
+        data_tests:
+          - not_null
+
+      - name: interval_minutes
+        data_tests:
+          - not_null
+
+      - name: observed_interval_count
+        data_tests:
+          - not_null
+
+      - name: expected_interval_count
+        data_tests:
+          - not_null
+
+      - name: average_price_eur_per_mwh
+        data_tests:
+          - not_null
+
+      - name: minimum_price_eur_per_mwh
+        data_tests:
+          - not_null
+
+      - name: maximum_price_eur_per_mwh
+        data_tests:
+          - not_null
+
+      - name: negative_price_interval_count
+        data_tests:
+          - not_null
+
+      - name: negative_price_duration_hours
+        data_tests:
+          - not_null
+
+      - name: coverage_ratio
+        data_tests:
+          - not_null
+
+      - name: is_complete_delivery_day
+        data_tests:
+          - not_null
+
+  - name: agg_daily_load
+    description: >
+      Daily actual electricity load KPIs by bidding zone and UTC observation
+      date, including observed energy and explicit temporal coverage.
+    columns:
+      - name: bidding_zone
+        data_tests:
+          - not_null
+
+      - name: observation_date
+        data_tests:
+          - not_null
+
+      - name: quantity_unit
+        data_tests:
+          - not_null
+
+      - name: resolution
+        data_tests:
+          - not_null
+
+      - name: interval_minutes
+        data_tests:
+          - not_null
+
+      - name: observed_interval_count
+        data_tests:
+          - not_null
+
+      - name: expected_interval_count
+        data_tests:
+          - not_null
+
+      - name: average_load_mw
+        data_tests:
+          - not_null
+
+      - name: minimum_load_mw
+        data_tests:
+          - not_null
+
+      - name: maximum_load_mw
+        data_tests:
+          - not_null
+
+      - name: peak_load_timestamp
+        data_tests:
+          - not_null
+
+      - name: observed_energy_mwh
+        data_tests:
+          - not_null
+
+      - name: coverage_ratio
+        data_tests:
+          - not_null
+
+      - name: is_complete_observation_day
+        data_tests:
+          - not_null
+
+  - name: agg_daily_generation_by_type
+    description: >
+      Daily actual electricity generation KPIs by bidding zone, UTC
+      observation date, production type, and domain direction, including
+      observed energy and explicit temporal coverage.
+    columns:
+      - name: bidding_zone
+        data_tests:
+          - not_null
+
+      - name: observation_date
+        data_tests:
+          - not_null
+
+      - name: psr_type
+        data_tests:
+          - not_null
+
+      - name: domain_direction
+        data_tests:
+          - not_null
+
+      - name: quantity_unit
+        data_tests:
+          - not_null
+
+      - name: resolution
+        data_tests:
+          - not_null
+
+      - name: interval_minutes
+        data_tests:
+          - not_null
+
+      - name: observed_interval_count
+        data_tests:
+          - not_null
+
+      - name: expected_interval_count
+        data_tests:
+          - not_null
+
+      - name: average_generation_mw
+        data_tests:
+          - not_null
+
+      - name: minimum_generation_mw
+        data_tests:
+          - not_null
+
+      - name: maximum_generation_mw
+        data_tests:
+          - not_null
+
+      - name: peak_generation_timestamp
+        data_tests:
+          - not_null
+
+      - name: observed_energy_mwh
+        data_tests:
+          - not_null
+
+      - name: coverage_ratio
+        data_tests:
+          - not_null
+
+      - name: is_complete_observation_day
         data_tests:
           - not_null
