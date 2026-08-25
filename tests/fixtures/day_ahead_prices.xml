@@ -14,6 +14,7 @@
     <contract_MarketAgreement.type>A01</contract_MarketAgreement.type>
     <currency_Unit.name>EUR</currency_Unit.name>
     <price_Measure_Unit.name>MWH</price_Measure_Unit.name>
+    <classificationSequence_AttributeInstanceComponent.position>2</classificationSequence_AttributeInstanceComponent.position>
     <curveType>A03</curveType>
 
     <Period>
@@ -44,6 +45,7 @@
     <contract_MarketAgreement.type>A01</contract_MarketAgreement.type>
     <currency_Unit.name>EUR</currency_Unit.name>
     <price_Measure_Unit.name>MWH</price_Measure_Unit.name>
+    <classificationSequence_AttributeInstanceComponent.position>1</classificationSequence_AttributeInstanceComponent.position>
     <curveType>A03</curveType>
 
     <Period>

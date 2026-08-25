@@ -44,6 +44,7 @@ daily as (
 
     select
         bidding_zone,
+        classification_sequence_position,
         date(period_end) as delivery_date,
         min(period_start) as period_start,
         max(period_end) as period_end,
@@ -75,6 +76,7 @@ daily as (
     from with_interval_minutes
     group by
         bidding_zone,
+        classification_sequence_position,
         delivery_date
 
 ),

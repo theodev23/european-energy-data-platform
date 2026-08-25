@@ -133,7 +133,8 @@ Dataset-specific values remain source-aligned:
 
 - actual load stores quantity and quantity unit;
 - actual generation stores quantity, quantity unit, and production `psrType`;
-- day-ahead prices store price amount, currency, and price unit.
+- day-ahead prices store price amount, currency, price unit, and the optional
+  ENTSO-E `classification_sequence_position` when supplied by the source.
 
 RAW parsing does not deduplicate source TimeSeries and does not synthesize missing positions.
 
@@ -248,7 +249,8 @@ Day-ahead price deduplication:
 - keeps RAW and staging source TimeSeries unchanged;
 
 - identifies equivalent duplicate day-ahead observations within the same source
-  object and document;
+  object and document, with `classification_sequence_position` included in the
+  business grain when present;
 
 - keeps one row deterministically using the lowest `time_series_id`;
 
@@ -273,7 +275,8 @@ The canonical business grains are:
 - actual load: `bidding_zone` and `point_timestamp`;
 - actual generation: `bidding_zone`, `psr_type`, `domain_direction`, and
   `point_timestamp`;
-- day-ahead prices: `in_domain` and `point_timestamp`.
+- day-ahead prices: `in_domain`, `classification_sequence_position`, and
+  `point_timestamp`.
 
 Singular tests verify that each canonical intermediate model is unique at its
 declared grain.
@@ -319,7 +322,12 @@ type, and timestamp.
 Its analytical grain is one day-ahead price observation per:
 
 - `bidding_zone`;
+- `classification_sequence_position`;
 - `point_timestamp`.
+
+`classification_sequence_position` is nullable because ENTSO-E does not expose
+it for every day-ahead TimeSeries. When present, it distinguishes parallel
+auction series that can contain different prices at the same timestamp.
 
 It also exposes `period_start` and `period_end` so downstream price aggregates
 can retain the ENTSO-E delivery-period semantics rather than grouping prices
@@ -358,6 +366,7 @@ silently treated as a complete day.
 `agg_daily_day_ahead_prices` has one row per:
 
 - `bidding_zone`;
+- `classification_sequence_position`;
 - ENTSO-E `delivery_date`.
 
 The delivery date is derived from the source delivery period rather than
@@ -392,13 +401,17 @@ Real BigQuery validation produced:
 
 - 96 canonical load observations in `fct_actual_load`;
 - 1,389 canonical generation observations in `fct_generation_by_type`;
-- 191 canonical price observations in `fct_day_ahead_prices`;
+- 191 canonical price observations in an earlier France overlap validation;
+- distinct DE-LU fact rows for classification sequence positions 1 and 2 at the
+  same timestamps after multi-zone runtime validation;
 - one France row in `agg_daily_load` for 2026-08-20 with 96/96 intervals,
   coverage 1.0, and 1,032,628.53 MWh of observed energy;
 - 15 France rows in `agg_daily_generation_by_type` for 2026-08-20, including
   partial groups at 75/96, 92/96, and 70/96 intervals;
 - two France rows in `agg_daily_day_ahead_prices`, with delivery-period
-  coverage of 95/96 and 96/96 intervals.
+  coverage of 95/96 and 96/96 intervals;
+- separate DE-LU daily price rows per classification sequence position, including
+  complete 96/96 series and an independently preserved partial 94/96 series.
 
 Targeted real dbt builds of all three daily KPI marts and their associated tests
 completed successfully.
@@ -517,6 +530,8 @@ deleting or mutating RAW history.
 
 Day-ahead prices first remove equivalent duplicate TimeSeries within the same
 source object and document after validating that those values are equivalent.
+The optional ENTSO-E `classification_sequence_position` is part of that business
+grain so parallel auction series are not incorrectly collapsed.
 
 All three datasets then apply cross-source canonicalization at their declared
 business grain. The preferred row is selected by highest `revision_number`,
@@ -529,7 +544,13 @@ canonicalization reduced:
 
 - actual load from 100 staged rows to 96 canonical rows;
 - actual generation from 1,446 normalized rows to 1,389 canonical rows;
-- day-ahead prices from 286 deduplicated rows to 191 canonical rows.
+- day-ahead prices from 286 deduplicated rows to 191 canonical rows in the
+  earlier France overlap validation.
+
+Subsequent multi-zone validation exposed parallel DE-LU TimeSeries with different
+prices at identical timestamps. Preserving `classification_sequence_position`
+resolved all 190 non-equivalent legacy-grain collisions observed in that source
+object while retaining equivalent duplicates where the classification is absent.
 
 Canonical intermediate models and marts both have singular uniqueness tests.
 Unexpected duplicates therefore remain visible as data-quality failures if the

@@ -2,6 +2,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
+
 from european_energy_data_platform.ingestion import RawPayload
 from european_energy_data_platform.parsing import parse_actual_load
 
@@ -179,6 +181,7 @@ def test_parse_day_ahead_prices_preserves_series_and_missing_positions() -> None
     assert first.contract_market_agreement_type == "A01"
     assert first.currency_unit == "EUR"
     assert first.price_unit == "MWH"
+    assert first.classification_sequence_position == 2
     assert first.curve_type == "A03"
 
     assert first.period_start == datetime(2026, 8, 19, 22, 0, tzinfo=UTC)
@@ -211,5 +214,80 @@ def test_parse_day_ahead_prices_preserves_series_and_missing_positions() -> None
     duplicate_source_series = rows[2]
 
     assert duplicate_source_series.time_series_mrid == "series-price-2"
+    assert duplicate_source_series.classification_sequence_position == 1
     assert duplicate_source_series.position == 24
     assert duplicate_source_series.price_amount == Decimal("164.96")
+
+
+def test_parse_day_ahead_prices_allows_missing_classification_sequence_position() -> None:
+    from european_energy_data_platform.parsing import parse_day_ahead_prices
+
+    content = Path("tests/fixtures/day_ahead_prices.xml").read_text()
+
+    for position in ("1", "2"):
+        content = content.replace(
+            (
+                "    <classificationSequence_AttributeInstanceComponent.position>"
+                f"{position}"
+                "</classificationSequence_AttributeInstanceComponent.position>\n"
+            ),
+            "",
+        )
+
+    payload = RawPayload(
+        object_name=(
+            "entsoe/day_ahead_prices/"
+            "bidding_zone=10YFR-RTE------C/"
+            "year=2026/month=08/day=20/"
+            "20260820T0000Z_20260820T0100Z.xml"
+        ),
+        content=content.encode(),
+    )
+
+    rows = parse_day_ahead_prices(payload)
+
+    assert len(rows) == 4
+    assert all(row.classification_sequence_position is None for row in rows)
+
+
+def test_parse_day_ahead_prices_rejects_non_positive_classification_sequence_position() -> None:
+    from european_energy_data_platform.parsing import parse_day_ahead_prices
+
+    content = Path("tests/fixtures/day_ahead_prices.xml").read_text()
+
+    old = (
+        "    <classificationSequence_AttributeInstanceComponent.position>"
+        "2"
+        "</classificationSequence_AttributeInstanceComponent.position>"
+    )
+
+    new = (
+        "    <classificationSequence_AttributeInstanceComponent.position>"
+        "0"
+        "</classificationSequence_AttributeInstanceComponent.position>"
+    )
+
+    if content.count(old) != 1:
+        raise AssertionError("Expected exactly one classification position 2 in fixture")
+
+    content = content.replace(
+        old,
+        new,
+        1,
+    )
+
+    payload = RawPayload(
+        object_name=(
+            "entsoe/day_ahead_prices/"
+            "bidding_zone=10YFR-RTE------C/"
+            "year=2026/month=08/day=20/"
+            "20260820T0000Z_20260820T0100Z.xml"
+        ),
+        content=content.encode(),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="ENTSO-E classification sequence position must be positive",
+    ):
+        parse_day_ahead_prices(payload)

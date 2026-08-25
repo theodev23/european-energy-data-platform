@@ -20,6 +20,7 @@ final as (
         document_id,
         time_series_id,
         in_domain as bidding_zone,
+        classification_sequence_position,
         auction_type,
         contract_market_agreement_type,
         period_start,

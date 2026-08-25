@@ -18,6 +18,7 @@ renamed as (
         contract_market_agreement_type,
         currency_unit,
         price_unit,
+        classification_sequence_position,
         curve_type,
         period_start,
         period_end,

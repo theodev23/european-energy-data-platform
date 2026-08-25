@@ -74,6 +74,7 @@ class DayAheadPriceRawRow:
     contract_market_agreement_type: str
     currency_unit: str
     price_unit: str
+    classification_sequence_position: int | None
     curve_type: str
     period_start: datetime
     period_end: datetime
@@ -335,6 +336,19 @@ def parse_day_ahead_prices(payload: RawPayload) -> list[DayAheadPriceRawRow]:
             time_series,
             "price_Measure_Unit.name",
         )
+        classification_sequence_position_text = _optional_text(
+            time_series,
+            "classificationSequence_AttributeInstanceComponent.position",
+        )
+        classification_sequence_position = (
+            int(classification_sequence_position_text)
+            if classification_sequence_position_text is not None
+            else None
+        )
+
+        if classification_sequence_position is not None and classification_sequence_position < 1:
+            raise ValueError("ENTSO-E classification sequence position must be positive")
+
         curve_type = _required_text(time_series, "curveType")
 
         for period in time_series:
@@ -385,6 +399,7 @@ def parse_day_ahead_prices(payload: RawPayload) -> list[DayAheadPriceRawRow]:
                         contract_market_agreement_type=(contract_market_agreement_type),
                         currency_unit=currency_unit,
                         price_unit=price_unit,
+                        classification_sequence_position=(classification_sequence_position),
                         curve_type=curve_type,
                         period_start=period_start,
                         period_end=period_end,

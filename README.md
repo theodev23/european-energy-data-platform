@@ -127,7 +127,8 @@ Implemented so far:
 - thin staging views for load, generation, and day-ahead prices;
 - intermediate models that:
   - normalize ENTSO-E generation bidding-zone direction;
-  - deduplicate equivalent day-ahead price TimeSeries within a source object;
+  - deduplicate equivalent day-ahead price TimeSeries within a source object
+    while preserving distinct ENTSO-E classification sequence positions;
   - canonicalize overlapping source extracts at each declared business grain
     using ENTSO-E revision metadata and deterministic technical tie-breakers;
 - analytics-ready fact marts:
@@ -138,7 +139,9 @@ Implemented so far:
   - `agg_daily_load`;
   - `agg_daily_generation_by_type`;
   - `agg_daily_day_ahead_prices`;
-- explicit fact and aggregate grains validated against real ENTSO-E data;
+- explicit fact and aggregate grains validated against real ENTSO-E data,
+  including parallel day-ahead auction series distinguished by
+  `classification_sequence_position`;
 - coverage-aware daily KPIs that preserve incomplete observation periods instead
   of silently treating partial data as complete;
 - dbt data-quality coverage with 149 tests across staging, intermediate, and marts;
@@ -147,7 +150,10 @@ Implemented so far:
 - real BigQuery canonicalization validation with:
   - 100 staged actual-load rows reduced to 96 canonical observations;
   - 1,446 normalized generation rows reduced to 1,389 canonical observations;
-  - 286 deduplicated day-ahead-price rows reduced to 191 canonical observations;
+  - earlier France overlap validation reducing 286 deduplicated day-ahead-price
+    rows to 191 canonical observations;
+  - multi-zone day-ahead validation preserving distinct DE-LU classification
+    sequence positions instead of merging non-equivalent parallel price series;
 - real BigQuery validation of daily KPI marts with:
   - one complete France load day at 96/96 PT15M intervals, including
     1,032,628.53 MWh of observed energy;
@@ -155,6 +161,8 @@ Implemented so far:
     series at 75/96, 92/96, and 70/96 intervals;
   - two France day-ahead delivery days with 95/96 and 96/96 intervals,
     preserving the incomplete first delivery period;
+  - DE-LU day-ahead KPIs separated by classification sequence position, including
+    distinct same-timestamp prices and independent completeness indicators;
 - pytest and Ruff quality checks;
 - Apache Airflow 3.3.1 daily orchestration with explicit 24-hour UTC data
   intervals, dynamic task mapping across the 10 target bidding zones, and

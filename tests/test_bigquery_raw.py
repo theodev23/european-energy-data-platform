@@ -74,6 +74,7 @@ def test_day_ahead_prices_schema_matches_raw_row_contract() -> None:
         ("contract_market_agreement_type", "STRING", "REQUIRED"),
         ("currency_unit", "STRING", "REQUIRED"),
         ("price_unit", "STRING", "REQUIRED"),
+        ("classification_sequence_position", "INTEGER", "NULLABLE"),
         ("curve_type", "STRING", "REQUIRED"),
         ("period_start", "TIMESTAMP", "REQUIRED"),
         ("period_end", "TIMESTAMP", "REQUIRED"),

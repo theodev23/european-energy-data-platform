@@ -34,8 +34,9 @@ models:
 
   - name: int_entsoe__day_ahead_prices_canonical
     description: >
-      Day-ahead electricity prices canonicalized to one row per bidding zone
-      and timestamp across overlapping source extracts. Canonical records
+      Day-ahead electricity prices canonicalized to one row per bidding zone,
+      classification sequence position, and timestamp across overlapping source
+      extracts. Canonical records
       prefer the highest ENTSO-E revision number, then the most recent
       document creation timestamp, with deterministic technical tie-breakers.
     columns:
@@ -50,6 +51,11 @@ models:
       - name: time_series_id
         data_tests:
           - not_null
+
+      - name: classification_sequence_position
+        description: >
+          ENTSO-E classification sequence position retained as part of the
+          canonical day-ahead price grain.
 
       - name: in_domain
         data_tests:
@@ -70,7 +76,8 @@ models:
   - name: int_entsoe__day_ahead_prices_deduplicated
     description: >
       Day-ahead electricity prices with equivalent ENTSO-E TimeSeries
-      duplicates reduced deterministically to one row per business point.
+      duplicates reduced deterministically while preserving distinct
+      classification sequence positions in the business grain.
     columns:
       - name: source_object_name
         data_tests:
@@ -83,6 +90,11 @@ models:
       - name: time_series_id
         data_tests:
           - not_null
+
+      - name: classification_sequence_position
+        description: >
+          ENTSO-E classification sequence position retained as part of the
+          deduplicated day-ahead price grain.
 
       - name: in_domain
         data_tests:

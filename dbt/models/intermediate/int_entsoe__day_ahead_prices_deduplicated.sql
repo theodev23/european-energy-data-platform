@@ -15,6 +15,7 @@ ranked as (
                 auction_type,
                 business_type,
                 contract_market_agreement_type,
+                classification_sequence_position,
                 point_timestamp
             order by time_series_id
         ) as duplicate_rank
@@ -36,6 +37,7 @@ deduplicated as (
         contract_market_agreement_type,
         currency_unit,
         price_unit,
+        classification_sequence_position,
         curve_type,
         period_start,
         period_end,

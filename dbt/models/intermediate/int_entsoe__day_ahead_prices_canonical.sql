@@ -12,6 +12,7 @@ ranked as (
         row_number() over (
             partition by
                 in_domain,
+                classification_sequence_position,
                 point_timestamp
             order by
                 safe_cast(revision_number as int64) desc,
@@ -40,6 +41,7 @@ canonical as (
         contract_market_agreement_type,
         currency_unit,
         price_unit,
+        classification_sequence_position,
         curve_type,
         period_start,
         period_end,
