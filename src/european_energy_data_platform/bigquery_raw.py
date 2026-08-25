@@ -77,6 +77,11 @@ DAY_AHEAD_PRICES_SCHEMA = (
     ),
     bigquery.SchemaField("currency_unit", "STRING", mode="REQUIRED"),
     bigquery.SchemaField("price_unit", "STRING", mode="REQUIRED"),
+    bigquery.SchemaField(
+        "classification_sequence_position",
+        "INTEGER",
+        mode="NULLABLE",
+    ),
     bigquery.SchemaField("curve_type", "STRING", mode="REQUIRED"),
     bigquery.SchemaField("period_start", "TIMESTAMP", mode="REQUIRED"),
     bigquery.SchemaField("period_end", "TIMESTAMP", mode="REQUIRED"),

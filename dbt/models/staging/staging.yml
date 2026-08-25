@@ -70,6 +70,11 @@ models:
         data_tests:
           - not_null
 
+      - name: classification_sequence_position
+        description: >
+          ENTSO-E classification sequence position distinguishing parallel
+          day-ahead auction TimeSeries when present.
+
       - name: in_domain
         data_tests:
           - not_null

@@ -7,6 +7,7 @@ with grouped as (
         auction_type,
         business_type,
         contract_market_agreement_type,
+        classification_sequence_position,
         point_timestamp,
         count(*) as row_count,
         count(
@@ -35,6 +36,7 @@ with grouped as (
         auction_type,
         business_type,
         contract_market_agreement_type,
+        classification_sequence_position,
         point_timestamp
 )
 

@@ -85,8 +85,8 @@ models:
 
   - name: fct_day_ahead_prices
     description: >
-      Analytics-ready deduplicated day-ahead electricity prices by bidding
-      zone and timestamp.
+      Analytics-ready canonical day-ahead electricity prices by bidding
+      zone, classification sequence position, and timestamp.
     columns:
       - name: source_object_name
         data_tests:
@@ -103,6 +103,11 @@ models:
       - name: bidding_zone
         data_tests:
           - not_null
+
+      - name: classification_sequence_position
+        description: >
+          ENTSO-E classification sequence position distinguishing parallel
+          day-ahead auction price series when present.
 
       - name: auction_type
         data_tests:
@@ -142,12 +147,18 @@ models:
 
   - name: agg_daily_day_ahead_prices
     description: >
-      Daily day-ahead electricity price KPIs by bidding zone and ENTSO-E
-      delivery date, including explicit temporal coverage indicators.
+      Daily day-ahead electricity price KPIs by bidding zone,
+      classification sequence position, and ENTSO-E delivery date, including
+      explicit temporal coverage indicators.
     columns:
       - name: bidding_zone
         data_tests:
           - not_null
+
+      - name: classification_sequence_position
+        description: >
+          ENTSO-E classification sequence position retained in the daily price
+          KPI grain when present.
 
       - name: delivery_date
         data_tests:

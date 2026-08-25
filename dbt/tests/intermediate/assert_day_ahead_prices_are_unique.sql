@@ -7,6 +7,7 @@ with duplicates as (
         auction_type,
         business_type,
         contract_market_agreement_type,
+        classification_sequence_position,
         point_timestamp,
         count(*) as row_count
     from {{ ref('int_entsoe__day_ahead_prices_deduplicated') }}
@@ -18,6 +19,7 @@ with duplicates as (
         auction_type,
         business_type,
         contract_market_agreement_type,
+        classification_sequence_position,
         point_timestamp
     having count(*) > 1
 )

@@ -194,6 +194,7 @@ def test_load_day_ahead_prices_uses_deterministic_bigquery_load_job() -> None:
     assert first_series["price_amount"] == "164.96"
     assert first_series["currency_unit"] == "EUR"
     assert first_series["price_unit"] == "MWH"
+    assert first_series["classification_sequence_position"] == 2
 
     after_gap = call["json_rows"][1]
 
@@ -204,6 +205,7 @@ def test_load_day_ahead_prices_uses_deterministic_bigquery_load_job() -> None:
     second_series = call["json_rows"][2]
 
     assert second_series["time_series_mrid"] == "series-price-2"
+    assert second_series["classification_sequence_position"] == 1
     assert second_series["position"] == 24
     assert second_series["price_amount"] == "164.96"
 
