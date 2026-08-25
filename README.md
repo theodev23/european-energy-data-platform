@@ -167,8 +167,12 @@ Implemented so far:
 - Apache Airflow 3.3.1 daily orchestration with explicit 24-hour UTC data
   intervals, dynamic task mapping across the 10 target bidding zones, and
   explicit concurrency limits;
-- runtime Airflow validation of all three ingestion task families for France
-  and of the downstream `run_dbt_build` task;
+- real post-migration Airflow validation across all 10 target bidding zones with:
+  - 30 mapped ingestion task instances across the three MVP datasets;
+  - the downstream `run_dbt_build` task;
+  - all 31 task instances succeeding;
+  - a full real dbt build completing with `PASS=163`, `WARN=0`, `ERROR=0`,
+    and `SKIP=0`;
 - GitHub Actions CI for Python quality, cloud-free dbt project validation, and
   cloud-free Airflow DAG validation;
 - `.env.example` for local configuration without committing secrets.
@@ -273,7 +277,7 @@ if spec is None or spec.loader is None:
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
-dag = module.dag
+dag = module.entsoe_daily_pipeline()
 dag.validate()
 
 print("Airflow DAG validation passed.")
